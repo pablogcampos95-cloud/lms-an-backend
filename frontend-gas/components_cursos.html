@@ -1,14 +1,85 @@
-<section id="view-cursos" class="view" data-title="Cursos">
-  <div class="row g-3" id="coursesGrid">
-    <div class="col-md-6 col-xl-4">
-      <article class="course-card p-3 h-100">
-        <span class="badge badge-soft mb-3">En preparacion</span>
-        <h2 class="h5">Catalogo de cursos</h2>
-        <p class="text-secondary mb-3">Esta vista queda conectada a la arquitectura y lista para el CRUD de cursos.</p>
-        <div class="progress bg-black" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar bg-warning" style="width: 0%"></div>
-        </div>
-      </article>
+<section id="view-cursos" class="view" data-title="Administracion LMS">
+  <div id="coursesListPanel">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+      <div>
+        <h1 class="h3 mb-1">Gestion de Cursos</h1>
+        <p class="text-secondary mb-0">Administra cursos, modulos, pasos, contenidos y publicacion.</p>
+      </div>
+      <button id="openCourseModal" class="btn btn-gold" type="button"><i class="fa-solid fa-plus me-2"></i>Crear curso</button>
+    </div>
+
+    <div class="data-panel mb-4">
+      <div class="row g-3">
+        <div class="col-lg-6"><input id="courseSearch" class="form-control" placeholder="Buscar curso"></div>
+        <div class="col-md-3"><select id="courseStatusFilter" class="form-select"><option value="">Todos los estados</option><option>Borrador</option><option>Publicado</option><option>Inactivo</option></select></div>
+        <div class="col-md-3"><input id="courseCategoryFilter" class="form-control" placeholder="Categoria"></div>
+      </div>
+    </div>
+
+    <div class="data-panel table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Curso</th><th>Categoria</th><th>Modulos</th><th>Estado</th><th>Creacion</th><th class="text-end">Acciones</th></tr></thead>
+        <tbody id="coursesTableBody"></tbody>
+      </table>
     </div>
   </div>
+
+  <div id="courseEditorPanel" class="d-none">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+      <div class="d-flex align-items-center gap-3">
+        <button id="backToCourses" class="btn btn-outline-light" type="button"><i class="fa-solid fa-arrow-left"></i></button>
+        <div><div class="text-secondary small">Editor de curso</div><h1 id="editorCourseName" class="h3 mb-0">Curso</h1></div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button id="previewCourse" class="btn btn-outline-light" type="button"><i class="fa-solid fa-eye me-2"></i>Vista previa</button>
+        <button id="editCurrentCourse" class="btn btn-outline-warning" type="button"><i class="fa-solid fa-pen me-2"></i>Editar datos</button>
+        <button id="publishCurrentCourse" class="btn btn-gold" type="button"><i class="fa-solid fa-globe me-2"></i>Publicar curso</button>
+      </div>
+    </div>
+
+    <div id="courseInfoSummary" class="data-panel mb-4"></div>
+    <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h4 mb-0">Modulos y pasos</h2><button id="openModuleModal" class="btn btn-gold" type="button"><i class="fa-solid fa-plus me-2"></i>Agregar modulo</button></div>
+    <div id="modulesEditor"></div>
+  </div>
+
+  <div class="modal fade" id="courseModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content bg-dark text-light">
+    <form id="courseForm"><div class="modal-header border-secondary"><h2 id="courseModalTitle" class="modal-title h5">Crear curso</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><input id="courseId" type="hidden"><div class="row g-3">
+        <div class="col-12"><label class="form-label">Nombre *</label><input id="courseName" class="form-control" required></div>
+        <div class="col-12"><label class="form-label">Descripcion corta</label><input id="courseShortDescription" class="form-control"></div>
+        <div class="col-12"><label class="form-label">Descripcion completa</label><textarea id="courseFullDescription" class="form-control" rows="4"></textarea></div>
+        <div class="col-md-6"><label class="form-label">Imagen de portada (URL)</label><input id="courseImage" class="form-control" type="url"></div>
+        <div class="col-md-6"><label class="form-label">Categoria</label><input id="courseCategory" class="form-control"></div>
+        <div class="col-md-4"><label class="form-label">Campana o area</label><input id="courseArea" class="form-control"></div>
+        <div class="col-md-4"><label class="form-label">Duracion (min)</label><input id="courseDuration" class="form-control" type="number" min="0" value="0"></div>
+        <div class="col-md-4"><label class="form-label">Estado</label><select id="courseStatus" class="form-select"><option>Borrador</option><option>Publicado</option><option>Inactivo</option></select></div>
+      </div></div><div class="modal-footer border-secondary"><button class="btn btn-outline-light" data-bs-dismiss="modal" type="button">Cancelar</button><button class="btn btn-gold" type="submit">Guardar curso</button></div>
+    </form></div></div></div>
+
+  <div class="modal fade" id="moduleModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content bg-dark text-light"><form id="moduleForm">
+    <div class="modal-header border-secondary"><h2 id="moduleModalTitle" class="modal-title h5">Agregar modulo</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><input id="moduleId" type="hidden"><div class="vstack gap-3">
+      <div><label class="form-label">Nombre *</label><input id="moduleName" class="form-control" required></div>
+      <div><label class="form-label">Descripcion</label><textarea id="moduleDescription" class="form-control"></textarea></div>
+      <div class="row g-3"><div class="col-6"><label class="form-label">Duracion (min)</label><input id="moduleDuration" class="form-control" type="number" min="0" value="0"></div><div class="col-6"><label class="form-label">Estado</label><select id="moduleStatus" class="form-select"><option>Borrador</option><option>Publicado</option><option>Inactivo</option></select></div></div>
+    </div></div><div class="modal-footer border-secondary"><button class="btn btn-outline-light" data-bs-dismiss="modal" type="button">Cancelar</button><button class="btn btn-gold" type="submit">Guardar modulo</button></div>
+  </form></div></div></div>
+
+  <div class="modal fade" id="lessonModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content bg-dark text-light"><form id="lessonForm">
+    <div class="modal-header border-secondary"><h2 id="lessonModalTitle" class="modal-title h5">Agregar paso</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><input id="lessonId" type="hidden"><input id="lessonModuleId" type="hidden"><div class="row g-3">
+      <div class="col-lg-8"><label class="form-label">Titulo *</label><input id="lessonTitle" class="form-control" required></div>
+      <div class="col-lg-4"><label class="form-label">Tipo de contenido</label><select id="lessonType" class="form-select"><option>Texto</option><option>URL</option><option>HTML</option><option>Archivo</option><option>Video</option><option>Evaluacion</option></select></div>
+      <div class="col-12"><label class="form-label">Descripcion</label><textarea id="lessonDescription" class="form-control" rows="2"></textarea></div>
+      <div id="lessonTextFields" class="col-12 lesson-type-fields"><label class="form-label">Contenido de texto</label><textarea id="lessonText" class="form-control" rows="7"></textarea></div>
+      <div id="lessonUrlFields" class="col-12 lesson-type-fields d-none"><div class="row g-3"><div class="col-lg-8"><label class="form-label">URL</label><input id="lessonUrl" class="form-control" type="url"></div><div class="col-lg-4"><label class="form-label">Tipo de URL</label><select id="lessonUrlType" class="form-select"><option>video</option><option>documento</option><option>pagina web</option><option>formulario</option><option>presentacion</option><option>otro</option></select></div><div class="col-12"><div class="form-check form-check-inline"><input id="lessonNewTab" class="form-check-input" type="checkbox" checked><label class="form-check-label">Abrir en nueva pestana</label></div><div class="form-check form-check-inline"><input id="lessonEmbedded" class="form-check-input" type="checkbox"><label class="form-check-label">Mostrar dentro del LMS</label></div></div></div></div>
+      <div id="lessonHtmlFields" class="col-12 lesson-type-fields d-none"><label class="form-label">HTML o iframe</label><textarea id="lessonHtml" class="form-control font-monospace" rows="8"></textarea><button id="previewEmbeddedHtml" class="btn btn-outline-light btn-sm mt-2" type="button">Previsualizar HTML</button><div id="embeddedHtmlPreview" class="embed-preview mt-3 d-none"></div></div>
+      <div id="lessonFileFields" class="col-12 lesson-type-fields d-none"><label class="form-label">Archivo (maximo 50 MB)</label><input id="lessonFile" class="form-control" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.mov,.zip"><small class="text-secondary">El paso se guarda primero y luego se carga el archivo.</small></div>
+      <div class="col-md-4"><label class="form-label">Tiempo (min)</label><input id="lessonDuration" class="form-control" type="number" min="0" value="0"></div>
+      <div class="col-md-4"><label class="form-label">Requisito</label><select id="lessonRequirement" class="form-select"><option>Libre</option><option>Secuencial</option><option>Obligatorio</option></select></div>
+      <div class="col-md-4"><label class="form-label">Estado</label><select id="lessonStatus" class="form-select"><option>Borrador</option><option>Publicado</option><option>Inactivo</option></select></div>
+    </div></div><div class="modal-footer border-secondary"><button class="btn btn-outline-light" data-bs-dismiss="modal" type="button">Cancelar</button><button class="btn btn-gold" type="submit">Guardar paso</button></div>
+  </form></div></div></div>
+
+  <div class="modal fade" id="coursePreviewModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content bg-dark text-light"><div class="modal-header border-secondary"><h2 class="modal-title h5">Vista previa del estudiante</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div id="coursePreviewBody" class="modal-body"></div></div></div></div>
 </section>

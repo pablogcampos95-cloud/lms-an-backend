@@ -4,15 +4,21 @@ const AppState = {
   roles: [],
   chart: null,
   userModal: null,
+  cursos: [],
+  cursoActual: null,
+  courseModal: null,
+  moduleModal: null,
+  lessonModal: null,
+  coursePreviewModal: null,
+  studentLessons: [],
+  studentLessonIndex: 0,
 };
 
 const MENUS = {
   Administrador: [
     ['dashboard', 'fa-chart-line', 'Dashboard'],
     ['usuarios', 'fa-users', 'Usuarios'],
-    ['cursos', 'fa-graduation-cap', 'Cursos'],
-    ['modulos', 'fa-layer-group', 'Modulos'],
-    ['lecciones', 'fa-circle-play', 'Lecciones'],
+    ['cursos', 'fa-sitemap', 'Administracion LMS'],
     ['evaluaciones', 'fa-clipboard-check', 'Evaluaciones'],
     ['certificados', 'fa-award', 'Certificados'],
     ['reportes', 'fa-file-lines', 'Reportes'],
@@ -43,6 +49,10 @@ const MENUS = {
 
 document.addEventListener('DOMContentLoaded', () => {
   AppState.userModal = new bootstrap.Modal(document.getElementById('userModal'));
+  AppState.courseModal = new bootstrap.Modal(document.getElementById('courseModal'));
+  AppState.moduleModal = new bootstrap.Modal(document.getElementById('moduleModal'));
+  AppState.lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
+  AppState.coursePreviewModal = new bootstrap.Modal(document.getElementById('coursePreviewModal'));
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('logoutButton').addEventListener('click', handleLogout);
@@ -56,6 +66,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('userStatusFilter').addEventListener('change', renderUsersTable);
   document.getElementById('exportUsersCsv').addEventListener('click', exportUsersCsv);
   document.getElementById('exportUsersPdf').addEventListener('click', () => window.print());
+  document.getElementById('openCourseModal').addEventListener('click', openCreateCourseModal);
+  document.getElementById('courseForm').addEventListener('submit', saveCourse);
+  document.getElementById('courseSearch').addEventListener('input', renderCoursesTable);
+  document.getElementById('courseStatusFilter').addEventListener('change', renderCoursesTable);
+  document.getElementById('courseCategoryFilter').addEventListener('input', renderCoursesTable);
+  document.getElementById('backToCourses').addEventListener('click', closeCourseEditor);
+  document.getElementById('openModuleModal').addEventListener('click', openCreateModuleModal);
+  document.getElementById('moduleForm').addEventListener('submit', saveModule);
+  document.getElementById('lessonForm').addEventListener('submit', saveLesson);
+  document.getElementById('lessonType').addEventListener('change', renderLessonTypeFields);
+  document.getElementById('previewEmbeddedHtml').addEventListener('click', previewEmbeddedHtml);
+  document.getElementById('editCurrentCourse').addEventListener('click', () => openEditCourseModal(AppState.cursoActual.id));
+  document.getElementById('publishCurrentCourse').addEventListener('click', publishCurrentCourse);
+  document.getElementById('previewCourse').addEventListener('click', previewCurrentCourse);
 
   boot();
 });
@@ -101,10 +125,11 @@ async function startSession(usuario) {
   AppState.usuario = usuario;
   document.getElementById('sessionName').textContent = usuario.Nombres || usuario.usuario;
   document.getElementById('sessionRole').textContent = usuario.rol ? usuario.rol.nombre : 'Sin rol';
+  document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   renderMenu();
   showApp();
   showView('dashboard');
-  await Promise.allSettled([loadDashboard(), loadRoles(), loadUsers()]);
+  await Promise.allSettled([loadDashboard(), loadRoles(), loadUsers(), loadCourses()]);
 }
 
 function showLogin() {
@@ -395,3 +420,268 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 }
+
+async function loadCourses() {
+  const tbody = document.getElementById('coursesTableBody');
+  tbody.innerHTML = '<tr><td colspan="6"><div class="skeleton"></div></td></tr>';
+  try {
+    AppState.cursos = await CursosService.listar();
+    renderCoursesTable();
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-warning">${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+function renderCoursesTable() {
+  const search = document.getElementById('courseSearch').value.trim().toLowerCase();
+  const status = document.getElementById('courseStatusFilter').value;
+  const category = document.getElementById('courseCategoryFilter').value.trim().toLowerCase();
+  const courses = AppState.cursos.filter((curso) => {
+    const text = [curso.nombre, curso.descripcion_corta, curso.categoria, curso.campana_area].join(' ').toLowerCase();
+    return (!search || text.includes(search)) && (!status || curso.estado === status) && (!category || String(curso.categoria || '').toLowerCase().includes(category));
+  });
+  const tbody = document.getElementById('coursesTableBody');
+  if (!courses.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-secondary">No hay cursos para mostrar.</td></tr>';
+    return;
+  }
+  const canManage = canManageCourses();
+  tbody.innerHTML = courses.map((curso) => `
+    <tr>
+      <td><div class="fw-semibold">${escapeHtml(curso.nombre)}</div><small class="text-secondary">${escapeHtml(curso.descripcion_corta || '')}</small></td>
+      <td>${escapeHtml(curso.categoria || '-')}</td>
+      <td>${curso.cantidad_modulos || 0}</td>
+      <td><span class="badge ${courseStatusClass(curso.estado)}">${escapeHtml(curso.estado)}</span></td>
+      <td>${formatDate(curso.created_at)}</td>
+      <td class="text-end text-nowrap">${canManage ? `
+        <button class="btn btn-outline-light btn-sm" title="Ver" onclick="openCourseEditor(${curso.id})"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-outline-warning btn-sm" title="Editar" onclick="openEditCourseModal(${curso.id})"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-outline-info btn-sm" title="Duplicar" onclick="duplicateCourse(${curso.id})"><i class="fa-solid fa-copy"></i></button>
+        <button class="btn btn-outline-success btn-sm" title="Publicar" onclick="setCourseStatus(${curso.id}, 'Publicado')"><i class="fa-solid fa-globe"></i></button>
+        <button class="btn btn-outline-secondary btn-sm" title="Desactivar" onclick="setCourseStatus(${curso.id}, 'Inactivo')"><i class="fa-solid fa-ban"></i></button>
+        <button class="btn btn-outline-danger btn-sm" title="Eliminar" onclick="deleteCourse(${curso.id})"><i class="fa-solid fa-trash"></i></button>
+      ` : `<button class="btn btn-gold btn-sm" onclick="openCourseEditor(${curso.id})"><i class="fa-solid fa-play me-2"></i>Continuar curso</button>`}</td>
+    </tr>
+  `).join('');
+}
+
+function courseStatusClass(status) {
+  if (status === 'Publicado') return 'text-bg-success';
+  if (status === 'Inactivo') return 'text-bg-secondary';
+  return 'text-bg-warning';
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleDateString('es-PE') : '-';
+}
+
+function openCreateCourseModal() {
+  document.getElementById('courseModalTitle').textContent = 'Crear curso';
+  document.getElementById('courseForm').reset();
+  document.getElementById('courseId').value = '';
+  document.getElementById('courseStatus').value = 'Borrador';
+  AppState.courseModal.show();
+}
+
+function fillCourseForm(curso) {
+  document.getElementById('courseId').value = curso.id;
+  document.getElementById('courseName').value = curso.nombre || '';
+  document.getElementById('courseShortDescription').value = curso.descripcion_corta || '';
+  document.getElementById('courseFullDescription').value = curso.descripcion_completa || '';
+  document.getElementById('courseImage').value = curso.imagen_portada_url || '';
+  document.getElementById('courseCategory').value = curso.categoria || '';
+  document.getElementById('courseArea').value = curso.campana_area || '';
+  document.getElementById('courseDuration').value = curso.duracion_estimada_min || 0;
+  document.getElementById('courseStatus').value = curso.estado || 'Borrador';
+}
+
+async function openEditCourseModal(id) {
+  try {
+    const curso = AppState.cursoActual && AppState.cursoActual.id === id ? AppState.cursoActual : await CursosService.obtener(id);
+    document.getElementById('courseModalTitle').textContent = 'Editar curso';
+    fillCourseForm(curso);
+    AppState.courseModal.show();
+  } catch (error) { Swal.fire('No se pudo abrir el curso', error.message, 'error'); }
+}
+
+function getCoursePayload() {
+  return {
+    nombre: document.getElementById('courseName').value.trim(),
+    descripcion_corta: document.getElementById('courseShortDescription').value.trim(),
+    descripcion_completa: document.getElementById('courseFullDescription').value.trim(),
+    imagen_portada_url: document.getElementById('courseImage').value.trim() || null,
+    categoria: document.getElementById('courseCategory').value.trim(),
+    campana_area: document.getElementById('courseArea').value.trim(),
+    duracion_estimada_min: Number(document.getElementById('courseDuration').value || 0),
+    estado: document.getElementById('courseStatus').value,
+  };
+}
+
+async function saveCourse(event) {
+  event.preventDefault();
+  const id = document.getElementById('courseId').value;
+  try {
+    const curso = id ? await CursosService.actualizar(id, getCoursePayload()) : await CursosService.crear(getCoursePayload());
+    AppState.courseModal.hide();
+    await loadCourses();
+    if (AppState.cursoActual && Number(id) === AppState.cursoActual.id) await openCourseEditor(curso.id);
+    toastSuccess('Curso guardado');
+  } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
+}
+
+async function openCourseEditor(id) {
+  try {
+    AppState.cursoActual = canManageCourses() ? await CursosService.obtener(id) : await CursosService.aprender(id);
+    document.getElementById('coursesListPanel').classList.add('d-none');
+    document.getElementById('courseEditorPanel').classList.remove('d-none');
+    document.getElementById('editorCourseName').textContent = AppState.cursoActual.nombre;
+    document.getElementById('openModuleModal').classList.toggle('d-none', !canManageCourses());
+    document.getElementById('editCurrentCourse').classList.toggle('d-none', !canManageCourses());
+    document.getElementById('publishCurrentCourse').classList.toggle('d-none', !canManageCourses());
+    document.getElementById('previewCourse').classList.toggle('d-none', !canManageCourses());
+    document.getElementById('courseInfoSummary').innerHTML = `
+      <div class="row g-4 align-items-center">
+        ${AppState.cursoActual.imagen_portada_url ? `<div class="col-md-3"><img class="course-cover" src="${escapeHtml(AppState.cursoActual.imagen_portada_url)}" alt="Portada"></div>` : ''}
+        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge badge-soft">${escapeHtml(AppState.cursoActual.categoria || 'Sin categoria')}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${AppState.cursoActual.duracion_estimada_min || 0} minutos</small></div>
+      </div>`;
+    renderModulesEditor();
+  } catch (error) { Swal.fire('No se pudo cargar el curso', error.message, 'error'); }
+}
+
+function closeCourseEditor() {
+  AppState.cursoActual = null;
+  document.getElementById('courseEditorPanel').classList.add('d-none');
+  document.getElementById('coursesListPanel').classList.remove('d-none');
+  loadCourses();
+}
+
+function renderModulesEditor() {
+  const container = document.getElementById('modulesEditor');
+  const modulos = AppState.cursoActual.modulos || [];
+  if (!modulos.length) { container.innerHTML = '<div class="empty-state">Este curso todavia no tiene modulos.</div>'; return; }
+  if (!canManageCourses()) {
+    AppState.studentLessons = modulos.flatMap((modulo) => modulo.lecciones);
+    container.innerHTML = modulos.map((modulo, index) => `
+      <article class="module-editor-card mb-3"><div class="module-editor-header"><div><div class="text-secondary small">Modulo ${index + 1}</div><h3 class="h5 mb-1">${escapeHtml(modulo.nombre)}</h3><small class="text-secondary">${modulo.lecciones.length} pasos · ${modulo.duracion_estimada_min || 0} min</small></div></div>
+      <div class="lesson-list">${modulo.lecciones.map((leccion) => { const lessonIndex = AppState.studentLessons.findIndex((item) => item.id === leccion.id); return `<button class="student-lesson-link" type="button" onclick="openStudentLesson(${lessonIndex})"><span class="lesson-order">${lessonIndex + 1}</span><span class="flex-grow-1 text-start"><strong>${escapeHtml(leccion.titulo)}</strong><small>${escapeHtml(leccion.tipo_contenido)} · ${leccion.tiempo_estimado_min || 0} min</small></span>${leccion.progreso && leccion.progreso.completado ? '<i class="fa-solid fa-circle-check text-success"></i>' : '<i class="fa-solid fa-chevron-right"></i>'}</button>`; }).join('')}</div></article>`).join('');
+    return;
+  }
+  container.innerHTML = modulos.map((modulo, index) => `
+    <article class="module-editor-card mb-3">
+      <div class="module-editor-header">
+        <div><div class="text-secondary small">Modulo ${index + 1}</div><h3 class="h5 mb-1">${escapeHtml(modulo.nombre)}</h3><small class="text-secondary">${modulo.lecciones.length} pasos · ${modulo.duracion_estimada_min || 0} min · ${escapeHtml(modulo.estado)}</small></div>
+        <div class="d-flex flex-wrap gap-1">
+          <button class="btn btn-outline-light btn-sm" onclick="moveModule(${modulo.id}, 'up')"><i class="fa-solid fa-arrow-up"></i></button>
+          <button class="btn btn-outline-light btn-sm" onclick="moveModule(${modulo.id}, 'down')"><i class="fa-solid fa-arrow-down"></i></button>
+          <button class="btn btn-outline-warning btn-sm" onclick="openEditModuleModal(${modulo.id})"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-outline-danger btn-sm" onclick="deleteModule(${modulo.id})"><i class="fa-solid fa-trash"></i></button>
+          <button class="btn btn-gold btn-sm" onclick="openCreateLessonModal(${modulo.id})"><i class="fa-solid fa-plus me-1"></i>Agregar paso</button>
+        </div>
+      </div>
+      <div class="lesson-list">${renderLessons(modulo)}</div>
+    </article>`).join('');
+}
+
+function renderLessons(modulo) {
+  if (!modulo.lecciones.length) return '<div class="text-secondary p-3">Sin pasos.</div>';
+  return modulo.lecciones.map((leccion, index) => `
+    <div class="lesson-row">
+      <div class="lesson-order">${index + 1}</div><div class="flex-grow-1"><div class="fw-semibold">${escapeHtml(leccion.titulo)}</div><small class="text-secondary">${escapeHtml(leccion.tipo_contenido)} · ${leccion.tiempo_estimado_min || 0} min · ${escapeHtml(leccion.estado)}</small></div>
+      <div class="text-nowrap"><button class="btn btn-outline-light btn-sm" onclick="moveLesson(${leccion.id}, 'up')"><i class="fa-solid fa-arrow-up"></i></button> <button class="btn btn-outline-light btn-sm" onclick="moveLesson(${leccion.id}, 'down')"><i class="fa-solid fa-arrow-down"></i></button> <button class="btn btn-outline-warning btn-sm" onclick="openEditLessonModal(${leccion.id})"><i class="fa-solid fa-pen"></i></button> <button class="btn btn-outline-danger btn-sm" onclick="deleteLesson(${leccion.id})"><i class="fa-solid fa-trash"></i></button></div>
+    </div>`).join('');
+}
+
+function openCreateModuleModal() {
+  document.getElementById('moduleModalTitle').textContent = 'Agregar modulo'; document.getElementById('moduleForm').reset(); document.getElementById('moduleId').value = ''; document.getElementById('moduleStatus').value = 'Borrador'; AppState.moduleModal.show();
+}
+
+function openEditModuleModal(id) {
+  const modulo = AppState.cursoActual.modulos.find((item) => item.id === id); if (!modulo) return;
+  document.getElementById('moduleModalTitle').textContent = 'Editar modulo'; document.getElementById('moduleId').value = modulo.id; document.getElementById('moduleName').value = modulo.nombre; document.getElementById('moduleDescription').value = modulo.descripcion || ''; document.getElementById('moduleDuration').value = modulo.duracion_estimada_min || 0; document.getElementById('moduleStatus').value = modulo.estado; AppState.moduleModal.show();
+}
+
+async function saveModule(event) {
+  event.preventDefault(); const id = document.getElementById('moduleId').value; const payload = { curso_id: AppState.cursoActual.id, nombre: document.getElementById('moduleName').value.trim(), descripcion: document.getElementById('moduleDescription').value.trim(), duracion_estimada_min: Number(document.getElementById('moduleDuration').value || 0), estado: document.getElementById('moduleStatus').value };
+  try { if (id) await CursosService.actualizarModulo(id, payload); else await CursosService.crearModulo(payload); AppState.moduleModal.hide(); await openCourseEditor(AppState.cursoActual.id); toastSuccess('Modulo guardado'); } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
+}
+
+async function moveModule(id, direction) { try { await CursosService.ordenarModulo(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
+async function deleteModule(id) { if (!(await confirmAction('Eliminar modulo', 'Tambien se eliminaran sus pasos y recursos.'))) return; try { await CursosService.eliminarModulo(id); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo eliminar', error.message, 'error'); } }
+
+function openCreateLessonModal(moduloId) {
+  document.getElementById('lessonModalTitle').textContent = 'Agregar paso'; document.getElementById('lessonForm').reset(); document.getElementById('lessonId').value = ''; document.getElementById('lessonModuleId').value = moduloId; document.getElementById('lessonType').value = 'Texto'; document.getElementById('lessonStatus').value = 'Borrador'; renderLessonTypeFields(); AppState.lessonModal.show();
+}
+
+function findLesson(id) { for (const modulo of AppState.cursoActual.modulos) { const leccion = modulo.lecciones.find((item) => item.id === id); if (leccion) return leccion; } return null; }
+function openEditLessonModal(id) {
+  const leccion = findLesson(id); if (!leccion) return;
+  document.getElementById('lessonModalTitle').textContent = 'Editar paso'; document.getElementById('lessonId').value = leccion.id; document.getElementById('lessonModuleId').value = leccion.modulo_id; document.getElementById('lessonTitle').value = leccion.titulo || ''; document.getElementById('lessonType').value = leccion.tipo_contenido; document.getElementById('lessonDescription').value = leccion.descripcion || ''; document.getElementById('lessonText').value = leccion.contenido_texto || ''; document.getElementById('lessonUrl').value = leccion.url_externa || ''; document.getElementById('lessonUrlType').value = leccion.tipo_url || 'otro'; document.getElementById('lessonNewTab').checked = leccion.abrir_nueva_pestana; document.getElementById('lessonEmbedded').checked = leccion.mostrar_embebido; document.getElementById('lessonHtml').value = leccion.contenido_html || ''; document.getElementById('lessonDuration').value = leccion.tiempo_estimado_min || 0; document.getElementById('lessonRequirement').value = leccion.requisito_avance || 'Libre'; document.getElementById('lessonStatus').value = leccion.estado; renderLessonTypeFields(); AppState.lessonModal.show();
+}
+
+function renderLessonTypeFields() {
+  document.querySelectorAll('.lesson-type-fields').forEach((element) => element.classList.add('d-none'));
+  const type = document.getElementById('lessonType').value;
+  if (type === 'Texto' || type === 'Evaluacion') document.getElementById('lessonTextFields').classList.remove('d-none');
+  if (type === 'URL' || type === 'Video') document.getElementById('lessonUrlFields').classList.remove('d-none');
+  if (type === 'HTML') document.getElementById('lessonHtmlFields').classList.remove('d-none');
+  if (type === 'Archivo') document.getElementById('lessonFileFields').classList.remove('d-none');
+}
+
+function getLessonPayload() { return { modulo_id: Number(document.getElementById('lessonModuleId').value), titulo: document.getElementById('lessonTitle').value.trim(), descripcion: document.getElementById('lessonDescription').value.trim(), tipo_contenido: document.getElementById('lessonType').value, contenido_texto: document.getElementById('lessonText').value, contenido_html: document.getElementById('lessonHtml').value, url_externa: document.getElementById('lessonUrl').value.trim() || null, tipo_url: document.getElementById('lessonUrlType').value, abrir_nueva_pestana: document.getElementById('lessonNewTab').checked, mostrar_embebido: document.getElementById('lessonEmbedded').checked, tiempo_estimado_min: Number(document.getElementById('lessonDuration').value || 0), requisito_avance: document.getElementById('lessonRequirement').value, estado: document.getElementById('lessonStatus').value }; }
+
+async function saveLesson(event) {
+  event.preventDefault(); const id = document.getElementById('lessonId').value; const payload = getLessonPayload();
+  try { const leccion = id ? await CursosService.actualizarLeccion(id, payload) : await CursosService.crearLeccion(payload); const file = document.getElementById('lessonFile').files[0]; if (file) await CursosService.subirArchivo(leccion.id, AppState.cursoActual.id, payload.modulo_id, file); AppState.lessonModal.hide(); await openCourseEditor(AppState.cursoActual.id); toastSuccess('Paso guardado'); } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
+}
+
+async function moveLesson(id, direction) { try { await CursosService.ordenarLeccion(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
+async function deleteLesson(id) { if (!(await confirmAction('Eliminar paso', 'Se eliminaran tambien sus recursos.'))) return; try { await CursosService.eliminarLeccion(id); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo eliminar', error.message, 'error'); } }
+
+function previewEmbeddedHtml() { const preview = document.getElementById('embeddedHtmlPreview'); preview.innerHTML = document.getElementById('lessonHtml').value; preview.classList.remove('d-none'); }
+
+async function setCourseStatus(id, estado) { try { const curso = AppState.cursos.find((item) => item.id === id) || await CursosService.obtener(id); await CursosService.actualizar(id, { estado }); await loadCourses(); if (AppState.cursoActual && AppState.cursoActual.id === id) await openCourseEditor(id); toastSuccess(`Curso ${estado.toLowerCase()}`); } catch (error) { Swal.fire('No se pudo actualizar', error.message, 'error'); } }
+async function publishCurrentCourse() { if (AppState.cursoActual) await setCourseStatus(AppState.cursoActual.id, 'Publicado'); }
+async function duplicateCourse(id) { try { await CursosService.duplicar(id); await loadCourses(); toastSuccess('Curso duplicado como borrador'); } catch (error) { Swal.fire('No se pudo duplicar', error.message, 'error'); } }
+async function deleteCourse(id) { if (!(await confirmAction('Eliminar curso', 'Se eliminara toda su estructura academica.'))) return; try { await CursosService.eliminar(id); await loadCourses(); toastSuccess('Curso eliminado'); } catch (error) { Swal.fire('No se pudo eliminar', error.message, 'error'); } }
+
+function previewCurrentCourse() {
+  const curso = AppState.cursoActual; if (!curso) return;
+  document.getElementById('coursePreviewBody').innerHTML = `<div class="student-course-preview"><div class="mb-4">${curso.imagen_portada_url ? `<img class="preview-cover" src="${escapeHtml(curso.imagen_portada_url)}" alt="Portada">` : ''}<h2>${escapeHtml(curso.nombre)}</h2><p class="text-secondary">${escapeHtml(curso.descripcion_completa || curso.descripcion_corta || '')}</p></div>${curso.modulos.map((modulo, index) => `<section class="preview-module"><h3 class="h5">${index + 1}. ${escapeHtml(modulo.nombre)}</h3>${modulo.lecciones.map((leccion) => `<article class="preview-lesson"><h4 class="h6">${escapeHtml(leccion.titulo)}</h4>${renderLessonPreview(leccion)}</article>`).join('')}</section>`).join('')}</div>`;
+  AppState.coursePreviewModal.show();
+}
+
+function renderLessonPreview(leccion) {
+  if (leccion.tipo_contenido === 'HTML') return `<div class="responsive-embed">${leccion.contenido_html || ''}</div>`;
+  if (leccion.tipo_contenido === 'Texto' || leccion.tipo_contenido === 'Evaluacion') return `<p>${escapeHtml(leccion.contenido_texto || leccion.descripcion || '')}</p>`;
+  if ((leccion.tipo_contenido === 'URL' || leccion.tipo_contenido === 'Video') && leccion.url_externa) return leccion.mostrar_embebido ? `<div class="responsive-embed"><iframe src="${escapeHtml(leccion.url_externa)}" loading="lazy"></iframe></div>` : `<a class="btn btn-outline-warning" href="${escapeHtml(leccion.url_externa)}" target="_blank" rel="noopener">Abrir recurso</a>`;
+  if (leccion.recursos && leccion.recursos.length) return leccion.recursos.map((recurso) => `<a class="btn btn-outline-light me-2" href="${escapeHtml(recurso.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-download me-2"></i>${escapeHtml(recurso.nombre_original)}</a>`).join('');
+  return '<span class="text-secondary">Contenido pendiente.</span>';
+}
+
+async function confirmAction(title, text) { const result = await Swal.fire({ title, text, icon: 'warning', showCancelButton: true, confirmButtonText: 'Confirmar', cancelButtonText: 'Cancelar' }); return result.isConfirmed; }
+function toastSuccess(title) { Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title }); }
+
+function canManageCourses() {
+  const rol = AppState.usuario && AppState.usuario.rol ? AppState.usuario.rol.nombre : '';
+  return rol === 'Administrador' || rol === 'Instructor';
+}
+
+function openStudentLesson(index) {
+  AppState.studentLessonIndex = index;
+  renderStudentLesson();
+  AppState.coursePreviewModal.show();
+}
+
+function renderStudentLesson() {
+  const leccion = AppState.studentLessons[AppState.studentLessonIndex];
+  if (!leccion) return;
+  document.getElementById('coursePreviewBody').innerHTML = `
+    <div class="student-lesson-view">
+      <div class="d-flex justify-content-between align-items-start gap-3 mb-4"><div><div class="text-secondary">Paso ${AppState.studentLessonIndex + 1} de ${AppState.studentLessons.length}</div><h2>${escapeHtml(leccion.titulo)}</h2><p class="text-secondary">${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div>
+      <div class="lesson-content mb-4">${renderLessonPreview(leccion)}</div>
+      <div class="d-flex flex-wrap justify-content-between gap-2"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button><button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>Marcar como completado</button><button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+    </div>`;
+}
+
+function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentLesson(); }
+async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentLesson(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }

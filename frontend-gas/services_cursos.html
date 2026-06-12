@@ -1,6 +1,27 @@
 const CursosService = {
-  async listar() {
-    const result = await ApiService.request('/api/cursos');
+  async listar(params = {}) {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
+    const result = await ApiService.request(`/api/cursos${query ? `?${query}` : ''}`);
     return result.data || [];
   },
+  async obtener(id) { return (await ApiService.request(`/api/cursos/${id}`)).data; },
+  async aprender(id) { return (await ApiService.request(`/api/cursos/${id}/aprender`)).data; },
+  async crear(payload) { return (await ApiService.request('/api/cursos', { method: 'POST', body: JSON.stringify(payload) })).data; },
+  async actualizar(id, payload) { return (await ApiService.request(`/api/cursos/${id}`, { method: 'PUT', body: JSON.stringify(payload) })).data; },
+  async eliminar(id) { return (await ApiService.request(`/api/cursos/${id}`, { method: 'DELETE' })).data; },
+  async duplicar(id) { return (await ApiService.request(`/api/cursos/${id}/duplicar`, { method: 'POST' })).data; },
+  async listarModulos(cursoId) { return (await ApiService.request(`/api/modulos?curso_id=${cursoId}`)).data; },
+  async crearModulo(payload) { return (await ApiService.request('/api/modulos', { method: 'POST', body: JSON.stringify(payload) })).data; },
+  async actualizarModulo(id, payload) { return (await ApiService.request(`/api/modulos/${id}`, { method: 'PUT', body: JSON.stringify(payload) })).data; },
+  async eliminarModulo(id) { return (await ApiService.request(`/api/modulos/${id}`, { method: 'DELETE' })).data; },
+  async ordenarModulo(id, direction) { return (await ApiService.request(`/api/modulos/${id}/orden`, { method: 'PATCH', body: JSON.stringify({ direction }) })).data; },
+  async crearLeccion(payload) { return (await ApiService.request('/api/lecciones', { method: 'POST', body: JSON.stringify(payload) })).data; },
+  async actualizarLeccion(id, payload) { return (await ApiService.request(`/api/lecciones/${id}`, { method: 'PUT', body: JSON.stringify(payload) })).data; },
+  async eliminarLeccion(id) { return (await ApiService.request(`/api/lecciones/${id}`, { method: 'DELETE' })).data; },
+  async ordenarLeccion(id, direction) { return (await ApiService.request(`/api/lecciones/${id}/orden`, { method: 'PATCH', body: JSON.stringify({ direction }) })).data; },
+  async subirArchivo(leccionId, cursoId, moduloId, file) {
+    const form = new FormData(); form.append('archivo', file); form.append('curso_id', cursoId); form.append('modulo_id', moduloId);
+    return (await ApiService.upload(`/api/lecciones/${leccionId}/archivo`, form)).data;
+  },
+  async completarLeccion(id, completado = true) { return (await ApiService.request(`/api/lecciones/${id}/completar`, { method: 'PATCH', body: JSON.stringify({ completado }) })).data; },
 };

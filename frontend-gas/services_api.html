@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001';
+const API_URL = 'https://lms-an-backend-production.up.railway.app';
 
 const ApiService = {
   getToken() {
@@ -42,6 +42,16 @@ const ApiService = {
       throw new Error(payload.message || 'Error al conectar con la API');
     }
 
+    return payload;
+  },
+
+  async upload(path, formData) {
+    const headers = {};
+    const token = this.getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: formData });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || 'No se pudo subir el archivo');
     return payload;
   },
 };

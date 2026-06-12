@@ -1,12 +1,16 @@
 const { Router } = require('express');
+const controller = require('../controllers/academico.controller');
+const { requireAuth } = require('../middlewares/auth.middleware');
+const { authorizeRoles } = require('../middlewares/role.middleware');
+const asyncHandler = require('../utils/asyncHandler');
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.status(501).json({
-    ok: false,
-    message: 'Modulo de modulos pendiente de implementar',
-  });
-});
+router.use(requireAuth, authorizeRoles('Administrador', 'Instructor'));
+router.get('/', asyncHandler(controller.listarModulos));
+router.post('/', asyncHandler(controller.crearModulo));
+router.put('/:id', asyncHandler(controller.actualizarModulo));
+router.patch('/:id/orden', asyncHandler(controller.ordenarModulo));
+router.delete('/:id', asyncHandler(controller.eliminarModulo));
 
 module.exports = router;
