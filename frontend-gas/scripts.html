@@ -1,0 +1,397 @@
+const AppState = {
+  usuario: null,
+  usuarios: [],
+  roles: [],
+  chart: null,
+  userModal: null,
+};
+
+const MENUS = {
+  Administrador: [
+    ['dashboard', 'fa-chart-line', 'Dashboard'],
+    ['usuarios', 'fa-users', 'Usuarios'],
+    ['cursos', 'fa-graduation-cap', 'Cursos'],
+    ['modulos', 'fa-layer-group', 'Modulos'],
+    ['lecciones', 'fa-circle-play', 'Lecciones'],
+    ['evaluaciones', 'fa-clipboard-check', 'Evaluaciones'],
+    ['certificados', 'fa-award', 'Certificados'],
+    ['reportes', 'fa-file-lines', 'Reportes'],
+    ['configuracion', 'fa-gear', 'Configuracion'],
+  ],
+  Analista: [
+    ['dashboard', 'fa-chart-line', 'Dashboard'],
+    ['usuarios', 'fa-users', 'Usuarios'],
+    ['reportes', 'fa-file-lines', 'Reportes'],
+    ['calidad', 'fa-shield-halved', 'Calidad'],
+    ['retencion', 'fa-user-check', 'Retencion'],
+  ],
+  Instructor: [
+    ['dashboard', 'fa-chart-line', 'Dashboard'],
+    ['cursos', 'fa-graduation-cap', 'Cursos'],
+    ['modulos', 'fa-layer-group', 'Modulos'],
+    ['lecciones', 'fa-circle-play', 'Lecciones'],
+    ['evaluaciones', 'fa-clipboard-check', 'Evaluaciones'],
+    ['avance', 'fa-bars-progress', 'Avance estudiantes'],
+  ],
+  Estudiante: [
+    ['cursos', 'fa-graduation-cap', 'Mis cursos'],
+    ['evaluaciones', 'fa-clipboard-check', 'Mis evaluaciones'],
+    ['certificados', 'fa-award', 'Mis certificados'],
+    ['dashboard', 'fa-chart-line', 'Mi avance'],
+  ],
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  AppState.userModal = new bootstrap.Modal(document.getElementById('userModal'));
+
+  document.getElementById('loginForm').addEventListener('submit', handleLogin);
+  document.getElementById('logoutButton').addEventListener('click', handleLogout);
+  document.getElementById('toggleSidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  });
+  document.getElementById('openUserModal').addEventListener('click', openCreateUserModal);
+  document.getElementById('userForm').addEventListener('submit', handleSaveUser);
+  document.getElementById('refreshUsers').addEventListener('click', loadUsers);
+  document.getElementById('userSearch').addEventListener('input', renderUsersTable);
+  document.getElementById('userStatusFilter').addEventListener('change', renderUsersTable);
+  document.getElementById('exportUsersCsv').addEventListener('click', exportUsersCsv);
+  document.getElementById('exportUsersPdf').addEventListener('click', () => window.print());
+
+  boot();
+});
+
+async function boot() {
+  const token = ApiService.getToken();
+  if (!token) {
+    showLogin();
+    return;
+  }
+
+  try {
+    const usuario = await AuthService.me();
+    await startSession(usuario);
+  } catch (error) {
+    AuthService.logout();
+    showLogin();
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const button = document.getElementById('loginButton');
+  const usuario = document.getElementById('loginUsuario').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ingresando';
+
+  try {
+    const sessionUser = await AuthService.login(usuario, password);
+    await startSession(sessionUser);
+    Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title: 'Sesion iniciada' });
+  } catch (error) {
+    Swal.fire('No se pudo iniciar sesion', error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar';
+  }
+}
+
+async function startSession(usuario) {
+  AppState.usuario = usuario;
+  document.getElementById('sessionName').textContent = usuario.Nombres || usuario.usuario;
+  document.getElementById('sessionRole').textContent = usuario.rol ? usuario.rol.nombre : 'Sin rol';
+  renderMenu();
+  showApp();
+  showView('dashboard');
+  await Promise.allSettled([loadDashboard(), loadRoles(), loadUsers()]);
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').classList.remove('d-none');
+  document.getElementById('appShell').classList.add('d-none');
+}
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('d-none');
+  document.getElementById('appShell').classList.remove('d-none');
+}
+
+function handleLogout() {
+  AuthService.logout();
+  AppState.usuario = null;
+  showLogin();
+}
+
+function renderMenu() {
+  const rol = AppState.usuario && AppState.usuario.rol ? AppState.usuario.rol.nombre : 'Estudiante';
+  const items = MENUS[rol] || MENUS.Estudiante;
+  const nav = document.getElementById('sideNav');
+
+  nav.innerHTML = items.map(([view, icon, label]) => `
+    <button class="side-link" type="button" data-view="${view}">
+      <i class="fa-solid ${icon}"></i>
+      <span class="nav-label">${label}</span>
+    </button>
+  `).join('');
+
+  nav.querySelectorAll('.side-link').forEach((button) => {
+    button.addEventListener('click', () => showView(button.dataset.view));
+  });
+}
+
+function showView(viewName) {
+  const target = document.getElementById(`view-${viewName}`) || document.getElementById('view-dashboard');
+  document.querySelectorAll('.view').forEach((view) => view.classList.remove('active'));
+  target.classList.add('active');
+
+  document.querySelectorAll('.side-link').forEach((button) => {
+    button.classList.toggle('active', button.dataset.view === viewName);
+  });
+
+  document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
+}
+
+async function loadDashboard() {
+  const container = document.getElementById('dashboardMetrics');
+  container.innerHTML = Array.from({ length: 8 }, () => '<div class="col-md-3"><div class="metric-card"><div class="skeleton"></div><div class="skeleton mt-3 w-50"></div></div></div>').join('');
+
+  try {
+    const data = await DashboardService.general();
+    const metrics = [
+      ['Cursos asignados', data.cursosAsignados],
+      ['Completados', data.cursosCompletados],
+      ['Pendientes', data.cursosPendientes],
+      ['Horas', data.horasCapacitacion],
+      ['Certificados', data.certificadosObtenidos],
+      ['Nota promedio', data.notaPromedio],
+      ['Ranking', data.rankingPersonal],
+      ['Avance', `${data.avanceGeneral}%`],
+    ];
+
+    container.innerHTML = metrics.map(([label, value]) => `
+      <div class="col-sm-6 col-xl-3">
+        <div class="metric-card">
+          <div class="metric-label">${label}</div>
+          <div class="metric-value">${value}</div>
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('dashboardSummary').innerHTML = metrics.slice(0, 5).map(([label, value]) => `
+      <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+        <span class="text-secondary">${label}</span>
+        <strong>${value}</strong>
+      </div>
+    `).join('');
+
+    renderProgressChart(data);
+  } catch (error) {
+    container.innerHTML = '<div class="col-12"><div class="alert alert-warning mb-0">No se pudo cargar el dashboard.</div></div>';
+  }
+}
+
+function renderProgressChart(data) {
+  const canvas = document.getElementById('progressChart');
+  if (AppState.chart) AppState.chart.destroy();
+
+  AppState.chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: ['Asignados', 'Completados', 'Pendientes', 'Certificados'],
+      datasets: [{
+        label: 'Cursos',
+        data: [data.cursosAsignados, data.cursosCompletados, data.cursosPendientes, data.certificadosObtenidos],
+        backgroundColor: ['#F4B400', '#f7d774', '#757575', '#ffffff'],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#a7a7a7' }, grid: { color: '#252525' } },
+        y: { ticks: { color: '#a7a7a7' }, grid: { color: '#252525' } },
+      },
+    },
+  });
+}
+
+async function loadRoles() {
+  try {
+    AppState.roles = await UsuariosService.roles();
+    renderRoleOptions();
+  } catch (error) {
+    AppState.roles = [];
+  }
+}
+
+function renderRoleOptions() {
+  const select = document.getElementById('fieldRol');
+  select.innerHTML = '<option value="">Seleccionar rol</option>' + AppState.roles.map((rol) => (
+    `<option value="${rol.id}">${rol.nombre}</option>`
+  )).join('');
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  tbody.innerHTML = '<tr><td colspan="9"><div class="skeleton"></div></td></tr>';
+
+  try {
+    AppState.usuarios = await UsuariosService.listar();
+    renderUsersTable();
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-warning">${error.message}</td></tr>`;
+  }
+}
+
+function renderUsersTable() {
+  const search = document.getElementById('userSearch').value.toLowerCase();
+  const status = document.getElementById('userStatusFilter').value;
+  const tbody = document.getElementById('usersTableBody');
+
+  const users = AppState.usuarios.filter((user) => {
+    const text = [user.DNI, user.Nombres, user.Correo, user.Cargo, user.Campaña, user.usuario, user.rol && user.rol.nombre].join(' ').toLowerCase();
+    return (!search || text.includes(search)) && (!status || user.Estado === status);
+  });
+
+  if (users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-secondary">No hay usuarios para mostrar.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = users.map((user) => `
+    <tr>
+      <td>${escapeHtml(user.DNI || '')}</td>
+      <td>${escapeHtml(user.Nombres || '')}</td>
+      <td>${escapeHtml(user.Correo || '')}</td>
+      <td>${escapeHtml(user.Cargo || '')}</td>
+      <td>${escapeHtml(user.Campaña || '')}</td>
+      <td><span class="badge ${user.Estado === 'Activo' ? 'text-bg-success' : 'text-bg-secondary'}">${escapeHtml(user.Estado || '')}</span></td>
+      <td>${escapeHtml(user.usuario || '')}</td>
+      <td>${escapeHtml(user.rol ? user.rol.nombre : '')}</td>
+      <td class="text-end">
+        <button class="btn btn-outline-light btn-sm me-1" type="button" onclick="openEditUserModal(${user.id})"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-outline-danger btn-sm" type="button" onclick="confirmDeleteUser(${user.id})"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openCreateUserModal() {
+  document.getElementById('userModalTitle').textContent = 'Crear usuario';
+  document.getElementById('userForm').reset();
+  document.getElementById('userId').value = '';
+  document.getElementById('fieldEstado').value = 'Activo';
+  document.getElementById('fieldPassword').required = true;
+  AppState.userModal.show();
+}
+
+function openEditUserModal(id) {
+  const user = AppState.usuarios.find((item) => item.id === id);
+  if (!user) return;
+
+  document.getElementById('userModalTitle').textContent = 'Editar usuario';
+  document.getElementById('userId').value = user.id;
+  document.getElementById('fieldDNI').value = user.DNI || '';
+  document.getElementById('fieldNombres').value = user.Nombres || '';
+  document.getElementById('fieldCorreo').value = user.Correo || '';
+  document.getElementById('fieldCargo').value = user.Cargo || '';
+  document.getElementById('fieldCampana').value = user.Campaña || '';
+  document.getElementById('fieldSupervisor').value = user.Supervisor || '';
+  document.getElementById('fieldEstado').value = user.Estado || 'Activo';
+  document.getElementById('fieldFechaIngreso').value = user.fecha_ingreso || '';
+  document.getElementById('fieldUsuario').value = user.usuario || '';
+  document.getElementById('fieldRol').value = user.rol_id || '';
+  document.getElementById('fieldPassword').value = '';
+  document.getElementById('fieldPassword').required = false;
+  AppState.userModal.show();
+}
+
+async function handleSaveUser(event) {
+  event.preventDefault();
+  const id = document.getElementById('userId').value;
+  const payload = {
+    DNI: document.getElementById('fieldDNI').value.trim(),
+    Nombres: document.getElementById('fieldNombres').value.trim(),
+    Correo: document.getElementById('fieldCorreo').value.trim(),
+    Cargo: document.getElementById('fieldCargo').value.trim(),
+    Campaña: document.getElementById('fieldCampana').value.trim(),
+    Supervisor: document.getElementById('fieldSupervisor').value.trim(),
+    Estado: document.getElementById('fieldEstado').value,
+    fecha_ingreso: document.getElementById('fieldFechaIngreso').value,
+    usuario: document.getElementById('fieldUsuario').value.trim(),
+    rol_id: Number(document.getElementById('fieldRol').value),
+  };
+
+  const password = document.getElementById('fieldPassword').value;
+  if (password) payload.password = password;
+
+  try {
+    if (id) {
+      await UsuariosService.actualizar(id, payload);
+    } else {
+      await UsuariosService.crear(payload);
+    }
+
+    AppState.userModal.hide();
+    await loadUsers();
+    Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title: 'Usuario guardado' });
+  } catch (error) {
+    Swal.fire('No se pudo guardar', error.message, 'error');
+  }
+}
+
+async function confirmDeleteUser(id) {
+  const result = await Swal.fire({
+    title: 'Eliminar usuario',
+    text: 'Esta accion no se puede deshacer.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar',
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    await UsuariosService.eliminar(id);
+    await loadUsers();
+    Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title: 'Usuario eliminado' });
+  } catch (error) {
+    Swal.fire('No se pudo eliminar', error.message, 'error');
+  }
+}
+
+function exportUsersCsv() {
+  const headers = ['DNI', 'Nombres', 'Correo', 'Cargo', 'Campana', 'Supervisor', 'Estado', 'Fecha ingreso', 'Usuario', 'Rol'];
+  const rows = AppState.usuarios.map((user) => [
+    user.DNI,
+    user.Nombres,
+    user.Correo,
+    user.Cargo,
+    user.Campaña,
+    user.Supervisor,
+    user.Estado,
+    user.fecha_ingreso,
+    user.usuario,
+    user.rol ? user.rol.nombre : '',
+  ]);
+
+  const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'usuarios-an-academy.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}

@@ -1,0 +1,6 @@
+const CursosService = {
+  async listar() {
+    const result = await ApiService.request('/api/cursos');
+    return result.data || [];
+  },
+};

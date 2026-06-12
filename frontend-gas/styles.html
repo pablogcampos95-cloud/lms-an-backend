@@ -1,0 +1,234 @@
+<style>
+  :root {
+    --bg: #090909;
+    --panel: #151515;
+    --panel-2: #1f1f1f;
+    --line: #2d2d2d;
+    --text: #f7f7f7;
+    --muted: #a7a7a7;
+    --gold: #F4B400;
+    --gold-dark: #b98700;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .login-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at top left, rgba(244, 180, 0, 0.18), transparent 34%),
+      linear-gradient(145deg, #050505, #171717 58%, #0d0d0d);
+  }
+
+  .login-panel {
+    width: min(100%, 430px);
+    border: 1px solid rgba(244, 180, 0, 0.18);
+    background: rgba(18, 18, 18, 0.92);
+    border-radius: 18px;
+    padding: 32px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+  }
+
+  .brand-mark {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #111;
+    background: var(--gold);
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .form-control,
+  .form-select {
+    background: #101010;
+    border-color: #303030;
+    color: var(--text);
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    background: #111;
+    border-color: var(--gold);
+    color: var(--text);
+    box-shadow: 0 0 0 0.2rem rgba(244, 180, 0, 0.18);
+  }
+
+  .btn-gold {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #111;
+    font-weight: 700;
+  }
+
+  .btn-gold:hover {
+    background: #ffca2c;
+    border-color: #ffca2c;
+    color: #111;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    display: flex;
+  }
+
+  .sidebar {
+    width: 280px;
+    background: #101010;
+    border-right: 1px solid var(--line);
+    transition: width 180ms ease;
+  }
+
+  .sidebar.collapsed {
+    width: 82px;
+  }
+
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .brand-copy {
+    display: none;
+  }
+
+  .sidebar-header {
+    height: 76px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .side-link {
+    width: 100%;
+    border: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--muted);
+    background: transparent;
+    padding: 12px 18px;
+    text-align: left;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .side-link:hover,
+  .side-link.active {
+    background: rgba(244, 180, 0, 0.12);
+    color: var(--text);
+  }
+
+  .side-link i {
+    width: 22px;
+    text-align: center;
+  }
+
+  .workspace {
+    min-width: 0;
+    flex: 1;
+    background: #0b0b0b;
+  }
+
+  .topbar {
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(13, 13, 13, 0.92);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .content-wrap {
+    padding: 24px;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .metric-card,
+  .data-panel,
+  .course-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .metric-card {
+    padding: 18px;
+  }
+
+  .metric-label {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .metric-value {
+    font-size: 1.9rem;
+    font-weight: 800;
+  }
+
+  .data-panel {
+    padding: 20px;
+  }
+
+  .table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text);
+    --bs-table-border-color: var(--line);
+  }
+
+  .table thead th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .badge-soft {
+    background: rgba(244, 180, 0, 0.14);
+    color: var(--gold);
+    border: 1px solid rgba(244, 180, 0, 0.25);
+  }
+
+  .skeleton {
+    min-height: 18px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #202020, #2c2c2c, #202020);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+
+  @keyframes shimmer {
+    to { background-position-x: -200%; }
+  }
+
+  @media (max-width: 900px) {
+    .app-shell { display: block; }
+    .sidebar {
+      width: 100%;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .sidebar.collapsed { width: 100%; }
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .brand-copy { display: inline; }
+    .side-nav {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .content-wrap { padding: 16px; }
+  }
+</style>

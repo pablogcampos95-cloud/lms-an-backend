@@ -1,0 +1,32 @@
+<section id="loginScreen" class="login-screen">
+  <div class="login-panel">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <div class="brand-mark">AN</div>
+      <div>
+        <h1 class="h3 mb-1 fw-bold">AN Academy</h1>
+        <p class="text-secondary mb-0">Aprendizaje, Desarrollo y Certificacion Corporativa</p>
+      </div>
+    </div>
+
+    <form id="loginForm" class="vstack gap-3">
+      <div>
+        <label class="form-label" for="loginUsuario">Usuario</label>
+        <input id="loginUsuario" class="form-control form-control-lg" value="Admin" autocomplete="username" required>
+      </div>
+      <div>
+        <label class="form-label" for="loginPassword">Contrasena</label>
+        <input id="loginPassword" class="form-control form-control-lg" type="password" value="Admin" autocomplete="current-password" required>
+      </div>
+      <div class="d-flex justify-content-between align-items-center">
+        <label class="form-check-label small text-secondary">
+          <input id="rememberMe" class="form-check-input me-1" type="checkbox" checked>
+          Recordarme
+        </label>
+        <button class="btn btn-link link-warning p-0 small" type="button">Recuperar contrasena</button>
+      </div>
+      <button id="loginButton" class="btn btn-gold btn-lg w-100" type="submit">
+        <i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar
+      </button>
+    </form>
+  </div>
+</section>

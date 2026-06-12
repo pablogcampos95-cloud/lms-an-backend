@@ -1,0 +1,21 @@
+const AuthService = {
+  async login(usuario, password) {
+    const result = await ApiService.request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ usuario, password }),
+    });
+
+    ApiService.setSession(result.token, result.usuario);
+    return result.usuario;
+  },
+
+  async me() {
+    const result = await ApiService.request('/api/auth/me');
+    ApiService.setSession(ApiService.getToken(), result.usuario);
+    return result.usuario;
+  },
+
+  logout() {
+    ApiService.clearSession();
+  },
+};

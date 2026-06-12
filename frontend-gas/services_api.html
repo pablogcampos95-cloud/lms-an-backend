@@ -1,0 +1,47 @@
+const API_URL = 'http://localhost:3001';
+
+const ApiService = {
+  getToken() {
+    return localStorage.getItem('an_academy_token');
+  },
+
+  setSession(token, usuario) {
+    localStorage.setItem('an_academy_token', token);
+    localStorage.setItem('an_academy_usuario', JSON.stringify(usuario));
+  },
+
+  getSessionUser() {
+    const raw = localStorage.getItem('an_academy_usuario');
+    return raw ? JSON.parse(raw) : null;
+  },
+
+  clearSession() {
+    localStorage.removeItem('an_academy_token');
+    localStorage.removeItem('an_academy_usuario');
+  },
+
+  async request(path, options = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
+
+    const token = this.getToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.message || 'Error al conectar con la API');
+    }
+
+    return payload;
+  },
+};

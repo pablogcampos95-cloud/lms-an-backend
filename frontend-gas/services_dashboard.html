@@ -1,0 +1,6 @@
+const DashboardService = {
+  async general() {
+    const result = await ApiService.request('/api/dashboard/general');
+    return result.data;
+  },
+};

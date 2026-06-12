@@ -1,0 +1,34 @@
+const UsuariosService = {
+  async listar() {
+    const result = await ApiService.request('/api/usuarios');
+    return result.data;
+  },
+
+  async crear(usuario) {
+    const result = await ApiService.request('/api/usuarios', {
+      method: 'POST',
+      body: JSON.stringify(usuario),
+    });
+    return result.data;
+  },
+
+  async actualizar(id, usuario) {
+    const result = await ApiService.request(`/api/usuarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(usuario),
+    });
+    return result.data;
+  },
+
+  async eliminar(id) {
+    const result = await ApiService.request(`/api/usuarios/${id}`, {
+      method: 'DELETE',
+    });
+    return result.data;
+  },
+
+  async roles() {
+    const result = await ApiService.request('/api/roles');
+    return result.data;
+  },
+};
