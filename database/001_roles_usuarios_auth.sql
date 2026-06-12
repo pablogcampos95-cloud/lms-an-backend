@@ -69,7 +69,7 @@ values (
   'Activo',
   current_date,
   'Admin',
-  '$2b$10$iBk4IBPYOOSmU6vsK6tK3eeDxCeQBMEjBOBBpl47egBA7lWUNnftK',
+  '$2b$10$le8AWMabPVi3/fushRJecexpiybptifx/rWjnP2hjfqYBoZeZ3/5W',
   (select id from public.roles where nombre = 'Administrador')
 )
 on conflict ((lower(usuario))) where usuario is not null
