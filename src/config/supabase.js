@@ -9,3 +9,12 @@ console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'EXISTE' : 'NO EXISTE');
 if (!supabaseUrl || !supabaseKey) {
   throw new Error('Faltan variables de entorno SUPABASE_URL o SUPABASE_KEY');
 }
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+});
+
+module.exports = supabase;
