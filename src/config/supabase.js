@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 
 const normalizeEnvValue = (value) => {
   if (!value) return value;
@@ -20,6 +21,9 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
+  },
+  realtime: {
+    transport: WebSocket,
   },
 });
 
