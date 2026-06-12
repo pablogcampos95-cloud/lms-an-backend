@@ -1,7 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const normalizeEnvValue = (value) => {
+  if (!value) return value;
+
+  return value.trim().replace(/^(['"])(.*)\1$/, '$2');
+};
+
+const supabaseUrl = normalizeEnvValue(process.env.SUPABASE_URL);
+const supabaseKey = normalizeEnvValue(process.env.SUPABASE_KEY);
 
 console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
 console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'EXISTE' : 'NO EXISTE');
