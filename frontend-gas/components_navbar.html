@@ -1,21 +1,23 @@
 <header class="topbar">
-  <div class="d-flex align-items-center gap-3">
-    <button id="toggleSidebar" class="btn btn-outline-light btn-sm" type="button" title="Contraer menu">
-      <i class="fa-solid fa-bars"></i>
-    </button>
-    <img class="brand-logo brand-logo-header" src="https://drive.google.com/thumbnail?id=1vBdo2lvVSSf40YUT8p3JiFIoUGE6hqkV&sz=w1000" alt="IA Learning Solutions">
-    <div>
-      <div id="viewTitle" class="fw-bold">Dashboard</div>
-      <small class="text-secondary">Aprendizaje corporativo impulsado por IA</small>
-    </div>
+  <div class="topbar-primary">
+    <button id="toggleSidebar" class="btn topbar-icon-button" type="button" title="Contraer menu"><i class="fa-solid fa-bars"></i></button>
+    <img class="brand-logo brand-logo-header" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
+    <nav class="main-navigation" aria-label="Navegacion principal">
+      <button type="button" onclick="showView('dashboard')"><i class="fa-solid fa-house"></i><span>Inicio</span></button>
+      <button type="button" onclick="showView('cursos')"><i class="fa-solid fa-layer-group"></i><span>Categorias</span></button>
+      <a href="#learningPlan" onclick="showView('dashboard')"><i class="fa-solid fa-route"></i><span>Mi plan</span></a>
+      <button type="button" onclick="showView('cursos')"><i class="fa-solid fa-graduation-cap"></i><span>Cursos</span></button>
+      <button type="button" onclick="showView('certificados')"><i class="fa-solid fa-award"></i><span>Certificados</span></button>
+    </nav>
   </div>
-  <div class="d-flex align-items-center gap-3">
-    <div class="text-end d-none d-sm-block">
-      <div id="sessionName" class="fw-semibold">Usuario</div>
-      <small id="sessionRole" class="text-secondary">Rol</small>
+  <div class="topbar-actions">
+    <label class="global-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Buscar en el LMS" aria-label="Buscar"></label>
+    <button class="topbar-icon-button notification-button" type="button" title="Notificaciones"><i class="fa-regular fa-bell"></i><span></span></button>
+    <div class="profile-chip">
+      <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+      <div class="profile-copy"><div id="sessionName" class="fw-semibold">Usuario</div><small id="sessionRole">Rol</small></div>
+      <i class="fa-solid fa-chevron-down profile-chevron"></i>
     </div>
-    <button id="logoutButton" class="btn btn-outline-brand btn-sm" type="button" title="Cerrar sesion">
-      <i class="fa-solid fa-arrow-right-from-bracket"></i>
-    </button>
+    <button id="logoutButton" class="btn topbar-icon-button" type="button" title="Cerrar sesion"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
   </div>
 </header>

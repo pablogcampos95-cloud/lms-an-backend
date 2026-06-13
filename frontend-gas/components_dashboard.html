@@ -1,28 +1,57 @@
-<section id="view-dashboard" class="view active" data-title="Dashboard">
-  <div class="dashboard-hero mb-4">
-    <div>
-      <span class="eyebrow">IA LEARNING SOLUTIONS</span>
-      <h1 class="display-6 fw-bold mb-2">Inteligencia aplicada al aprendizaje</h1>
-      <p class="text-secondary mb-0">Transformamos conocimiento en resultados medibles para tu organizacion.</p>
+<section id="view-dashboard" class="view active" data-title="Inicio">
+  <div class="learning-hero mb-4">
+    <div class="learning-hero-content">
+      <div class="hero-badges"><span class="hero-badge hero-badge-primary">CURSO DESTACADO</span><span class="hero-badge"><i class="fa-solid fa-star"></i> Recomendado</span></div>
+      <h1>Potencia tu talento con inteligencia artificial</h1>
+      <p>Descubre experiencias de aprendizaje corporativo diseñadas para transformar habilidades en resultados medibles.</p>
+      <div class="hero-meta"><span><i class="fa-regular fa-clock"></i> 4 h 30 min</span><span><i class="fa-solid fa-signal"></i> Intermedio</span><span><i class="fa-solid fa-users"></i> Corporativo</span></div>
+      <div class="hero-actions"><button class="btn btn-gold btn-lg" type="button" onclick="showView('cursos')"><i class="fa-solid fa-play me-2"></i>Comenzar curso</button><button class="btn btn-outline-light btn-lg" type="button" onclick="showView('cursos')">Mas informacion</button></div>
     </div>
-    <img class="brand-logo dashboard-logo" src="https://drive.google.com/thumbnail?id=1vBdo2lvVSSf40YUT8p3JiFIoUGE6hqkV&sz=w1000" alt="IA Learning Solutions">
+    <div class="hero-visual" aria-hidden="true">
+      <div class="ai-orbit ai-orbit-one"></div><div class="ai-orbit ai-orbit-two"></div>
+      <div class="ai-core"><i class="fa-solid fa-brain"></i></div>
+      <div class="ai-node node-one"><i class="fa-solid fa-chart-line"></i></div><div class="ai-node node-two"><i class="fa-solid fa-lightbulb"></i></div><div class="ai-node node-three"><i class="fa-solid fa-users"></i></div>
+      <img class="brand-logo hero-brand-logo" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
+    </div>
   </div>
-  <div class="row g-3 mb-4" id="dashboardMetrics"></div>
-  <div class="row g-3">
-    <div class="col-lg-8">
-      <div class="data-panel">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h5 mb-0">Avance general</h2>
-          <span class="badge badge-soft">Analitica inteligente</span>
-        </div>
-        <canvas id="progressChart" height="120"></canvas>
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="data-panel h-100">
-        <h2 class="h5 mb-3">Resumen personal</h2>
-        <div id="dashboardSummary" class="vstack gap-3"></div>
-      </div>
-    </div>
+
+  <div class="section-heading"><div><span class="eyebrow">TU ACTIVIDAD</span><h2>Resumen de aprendizaje</h2></div><div class="period-filter"><button class="active" type="button">Este mes</button><button type="button">Trimestre</button><button type="button">Anual</button></div></div>
+  <div class="row g-3 mb-5" id="dashboardMetrics"></div>
+
+  <div id="learningPlan" class="learning-plan-grid mb-5">
+    <article class="profile-progress-card">
+      <div class="profile-progress-header"><div class="profile-avatar profile-avatar-large"><i class="fa-solid fa-user"></i></div><div><span class="eyebrow">MI PLAN DE APRENDIZAJE</span><h2>Hola, <span id="profileWelcomeName">talento</span></h2><p>Sigue avanzando hacia tu siguiente nivel.</p></div></div>
+      <div class="level-progress"><div class="level-copy"><span>Nivel 4 · Explorador IA</span><strong>1,480 XP</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:68%"></div></div><small>520 XP para alcanzar el nivel 5</small></div>
+      <div class="profile-stats"><div><strong>12</strong><span>Horas aprendidas</span></div><div><strong>4</strong><span>Cursos activos</span></div><div><strong>7</strong><span>Logros</span></div></div>
+    </article>
+    <article class="achievement-card">
+      <div class="d-flex justify-content-between align-items-start"><div><span class="eyebrow achievement-eyebrow">LOGRO RECIENTE</span><h3>Aprendiz continuo</h3><p>Completaste tres semanas consecutivas de aprendizaje.</p></div><div class="medal-icon"><i class="fa-solid fa-medal"></i></div></div>
+      <div class="achievement-footer"><div class="achievement-streak"><i class="fa-solid fa-fire"></i><strong>21 dias</strong><span>Racha actual</span></div><button class="btn achievement-button" type="button" onclick="showView('certificados')">Ver mis logros</button></div>
+    </article>
+  </div>
+
+  <div class="section-heading"><div><span class="eyebrow">RETOMA TU PROGRESO</span><h2>Continuar viendo</h2></div><button class="section-action" type="button" onclick="showView('cursos')">Ver todos <i class="fa-solid fa-arrow-right"></i></button></div>
+  <div class="course-showcase-grid mb-5">
+    <article class="visual-course-card course-theme-ai"><div class="course-image"><div class="course-icon"><i class="fa-solid fa-brain"></i></div><span class="course-status in-progress">En progreso</span></div><div class="course-card-body"><span class="course-category">INTELIGENCIA ARTIFICIAL</span><h3>IA aplicada a los negocios</h3><div class="course-meta"><span><i class="fa-regular fa-clock"></i> 3 h 20 min</span><span>Intermedio</span></div><div class="course-progress-copy"><span>Progreso</span><strong>68%</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:68%"></div></div><button class="btn course-action" type="button" onclick="showView('cursos')">Continuar aprendizaje</button></div></article>
+    <article class="visual-course-card course-theme-leadership"><div class="course-image"><div class="course-icon"><i class="fa-solid fa-people-group"></i></div><span class="course-status mandatory">Obligatorio</span></div><div class="course-card-body"><span class="course-category">LIDERAZGO</span><h3>Liderazgo para equipos de alto rendimiento</h3><div class="course-meta"><span><i class="fa-regular fa-clock"></i> 5 h</span><span>Avanzado</span></div><div class="course-progress-copy"><span>Progreso</span><strong>35%</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:35%"></div></div><button class="btn course-action" type="button" onclick="showView('cursos')">Continuar aprendizaje</button></div></article>
+    <article class="visual-course-card course-theme-sales"><div class="course-image"><div class="course-icon"><i class="fa-solid fa-chart-line"></i></div><span class="course-status recommended">Recomendado</span></div><div class="course-card-body"><span class="course-category">VENTAS</span><h3>Ventas consultivas con datos</h3><div class="course-meta"><span><i class="fa-regular fa-clock"></i> 2 h 45 min</span><span>Inicial</span></div><div class="course-progress-copy"><span>Progreso</span><strong>12%</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:12%"></div></div><button class="btn course-action" type="button" onclick="showView('cursos')">Continuar aprendizaje</button></div></article>
+  </div>
+
+  <div class="section-heading"><div><span class="eyebrow">DESARROLLA NUEVAS HABILIDADES</span><h2>Cursos recomendados</h2></div><button class="section-action" type="button" onclick="showView('cursos')">Explorar catalogo <i class="fa-solid fa-arrow-right"></i></button></div>
+  <div class="recommendation-strip mb-5">
+    <article><div class="recommendation-icon"><i class="fa-solid fa-headset"></i></div><div><span>Experiencia del cliente</span><strong>Servicio memorable</strong><small>8 lecciones · 2 h</small></div><button type="button" onclick="showView('cursos')"><i class="fa-solid fa-arrow-right"></i></button></article>
+    <article><div class="recommendation-icon"><i class="fa-solid fa-comments"></i></div><div><span>Comunicacion</span><strong>Conversaciones efectivas</strong><small>6 lecciones · 1 h 30 min</small></div><button type="button" onclick="showView('cursos')"><i class="fa-solid fa-arrow-right"></i></button></article>
+    <article><div class="recommendation-icon"><i class="fa-solid fa-shield-halved"></i></div><div><span>Calidad</span><strong>Cultura de excelencia</strong><small>10 lecciones · 3 h</small></div><button type="button" onclick="showView('cursos')"><i class="fa-solid fa-arrow-right"></i></button></article>
+  </div>
+
+  <div class="section-heading"><div><span class="eyebrow">CRECE PASO A PASO</span><h2>Rutas de aprendizaje</h2></div></div>
+  <div class="learning-paths mb-5">
+    <article class="learning-path-card"><div class="path-number">01</div><div class="path-content"><span>Ruta profesional</span><h3>Especialista en Inteligencia Artificial</h3><p>Domina fundamentos, herramientas y aplicaciones corporativas de IA.</p><div class="path-stats"><span><i class="fa-solid fa-book-open"></i> 5 cursos</span><span><i class="fa-regular fa-clock"></i> 18 horas</span><span><i class="fa-solid fa-medal"></i> Certificacion</span></div></div><div class="path-progress"><strong>42%</strong><div class="progress premium-progress"><div class="progress-bar" style="width:42%"></div></div><button class="btn btn-outline-light" type="button" onclick="showView('cursos')">Ver ruta</button></div></article>
+    <article class="learning-path-card"><div class="path-number">02</div><div class="path-content"><span>Ruta de liderazgo</span><h3>Lider de equipos de alto rendimiento</h3><p>Desarrolla competencias para movilizar talento, cambio y resultados.</p><div class="path-stats"><span><i class="fa-solid fa-book-open"></i> 4 cursos</span><span><i class="fa-regular fa-clock"></i> 14 horas</span><span><i class="fa-solid fa-medal"></i> Diploma</span></div></div><div class="path-progress"><strong>18%</strong><div class="progress premium-progress"><div class="progress-bar" style="width:18%"></div></div><button class="btn btn-outline-light" type="button" onclick="showView('cursos')">Ver ruta</button></div></article>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-8"><div class="data-panel analytics-panel"><div class="d-flex justify-content-between align-items-center mb-3"><div><span class="eyebrow">ANALITICA PERSONAL</span><h2 class="h5 mb-0">Avance general</h2></div><span class="badge badge-soft">Actualizado hoy</span></div><canvas id="progressChart" height="120"></canvas></div></div>
+    <div class="col-xl-4"><div class="data-panel h-100 summary-panel"><div class="d-flex justify-content-between align-items-center"><div><span class="eyebrow">INDICADORES</span><h2 class="h5 mb-0">Resumen personal</h2></div><i class="fa-solid fa-chart-pie summary-icon"></i></div><div id="dashboardSummary" class="vstack gap-3 mt-4"></div></div></div>
   </div>
 </section>

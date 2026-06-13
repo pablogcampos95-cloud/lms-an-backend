@@ -1,8 +1,8 @@
 function doGet() {
   return HtmlService
-    .createTemplateFromFile('index')
+    .createTemplateFromFile('Index')
     .evaluate()
-    .setTitle('AN Academy')
+    .setTitle('IA Learning Solutions')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
