@@ -16,6 +16,16 @@ const AppState = {
   studentLessonIndex: 0,
   dashboardData: null,
   previewMode: false,
+  evaluaciones: [],
+  foros: [],
+  evaluationQuestions: [],
+  evaluationTab: 'evaluations',
+  evaluationModal: null,
+  takeEvaluationModal: null,
+  forumModal: null,
+  forumResponseModal: null,
+  currentAttempt: null,
+  evaluationHasAttempts: false,
 };
 
 const MENUS = {
@@ -58,6 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
   AppState.coursePreviewModal = new bootstrap.Modal(document.getElementById('coursePreviewModal'));
   AppState.courseAssignmentModal = new bootstrap.Modal(document.getElementById('courseAssignmentModal'));
+  AppState.evaluationModal = new bootstrap.Modal(document.getElementById('evaluationModal'));
+  AppState.takeEvaluationModal = new bootstrap.Modal(document.getElementById('takeEvaluationModal'));
+  AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
+  AppState.forumResponseModal = new bootstrap.Modal(document.getElementById('forumResponseModal'));
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('logoutButton').addEventListener('click', handleLogout);
@@ -87,6 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('previewCourse').addEventListener('click', previewCurrentCourse);
   document.getElementById('assignCourseStudents').addEventListener('click', openCourseAssignmentModal);
   document.getElementById('saveCourseAssignments').addEventListener('click', saveCourseAssignments);
+  document.getElementById('evaluationForm').addEventListener('submit', saveEvaluation);
+  document.getElementById('takeEvaluationForm').addEventListener('submit', submitEvaluationAttempt);
+  document.getElementById('forumForm').addEventListener('submit', saveForum);
+  document.getElementById('forumResponseForm').addEventListener('submit', submitForumResponse);
   document.getElementById('studentCourseSearch').addEventListener('input', renderStudentCoursesCatalog);
   document.getElementById('studentCourseProgressFilter').addEventListener('change', renderStudentCoursesCatalog);
 
@@ -151,7 +169,8 @@ function configureRoleInterface() {
   const student = isStudent();
   document.getElementById('createEvaluationButton').classList.toggle('d-none', student);
   document.getElementById('createCertificateButton').classList.toggle('d-none', student);
-  document.querySelector('#view-evaluaciones .row').classList.toggle('d-none', student);
+  document.getElementById('createForumButton').classList.toggle('d-none', student);
+  document.getElementById('evaluationAdminFilters').classList.toggle('d-none', student);
   document.querySelector('#view-certificados .row').classList.toggle('d-none', student);
   document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   const navButtons = document.querySelectorAll('.main-navigation button');
@@ -221,7 +240,7 @@ function showView(viewName) {
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
   if (viewName === 'plan') renderCurrentPlan();
   if (isStudent() && viewName === 'student-courses') loadStudentCourses();
-  if (isStudent() && viewName === 'evaluaciones') loadStudentEvaluations();
+  if (viewName === 'evaluaciones') loadEvaluations();
   if (isStudent() && viewName === 'certificados') loadStudentCertificates();
 }
 
@@ -364,16 +383,33 @@ async function openStudentCourse(id) {
   try {
     AppState.cursoActual = await CursosService.aprender(id);
     AppState.previewMode = false;
-    AppState.studentLessons = (AppState.cursoActual.modulos || []).flatMap((modulo) =>
-      (modulo.lecciones || []).map((leccion) => ({ ...leccion, modulo_nombre: modulo.nombre }))
-    );
-    const firstPending = AppState.studentLessons.findIndex((leccion) => !(leccion.progreso && leccion.progreso.completado));
+    AppState.studentLessons = buildStudentJourney(AppState.cursoActual);
+    const firstPending = AppState.studentLessons.findIndex((item) => !item.completada && !(item.progreso && item.progreso.completado));
     AppState.studentLessonIndex = firstPending >= 0 ? firstPending : Math.max(AppState.studentLessons.length - 1, 0);
     renderStudentCoursePlayer();
     AppState.coursePreviewModal.show();
   } catch (error) {
     Swal.fire('No se pudo abrir el curso', error.message, 'error');
   }
+}
+
+function buildStudentJourney(course) {
+  const activities = course.actividades || [];
+  const journey = [];
+  let locked = false;
+  const appendActivity = (activity, moduleName) => {
+    journey.push({ ...activity, es_actividad: true, modulo_nombre: moduleName || 'Actividad del curso', bloqueado: locked });
+    if (activity.obligatoria && activity.bloquea_avance && !activity.completada) locked = true;
+  };
+  (course.modulos || []).forEach((module) => {
+    (module.lecciones || []).forEach((lesson) => {
+      journey.push({ ...lesson, modulo_nombre: module.nombre, bloqueado: locked });
+      activities.filter((activity) => activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(lesson.id)).forEach((activity) => appendActivity(activity, module.nombre));
+    });
+    activities.filter((activity) => activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => appendActivity(activity, module.nombre));
+  });
+  activities.filter((activity) => activity.ubicacion === 'FinCurso').forEach((activity) => appendActivity(activity, 'Cierre del curso'));
+  return journey;
 }
 
 async function loadStudentCourses() {
@@ -436,15 +472,112 @@ function renderStudentCoursesCatalog() {
   }).join('') : '<div class="empty-state student-courses-empty"><i class="fa-solid fa-book-open fa-2x mb-3"></i><strong>No encontramos cursos</strong><span>Cuando tengas cursos asignados apareceran en esta seccion.</span></div>';
 }
 
-async function loadStudentEvaluations() {
+async function loadEvaluations() {
   const container = document.getElementById('evaluationsContent');
   container.innerHTML = '<div class="skeleton"></div>';
   try {
-    const items = await EstudianteService.evaluaciones();
-    container.className = items.length ? 'student-resource-list' : 'empty-state';
-    container.innerHTML = items.length ? items.map((item) => `<article><div><span class="eyebrow">${escapeHtml(item.curso.nombre)}</span><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.descripcion || 'Evaluacion asignada')}</p></div><button class="btn btn-gold" onclick="openStudentCourse(${item.curso.id})">Abrir evaluacion</button></article>`).join('') : '<i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><div class="fw-semibold">No tienes evaluaciones asignadas</div>';
+    if (AppState.evaluationTab === 'forums') {
+      AppState.foros = await EvaluacionesService.listarForos();
+      renderForums();
+      return;
+    }
+    const params = isStudent() ? {} : { curso_id: document.getElementById('evaluationCourseFilter').value, estado: document.getElementById('evaluationStatusFilter').value };
+    AppState.evaluaciones = await EvaluacionesService.listar(params);
+    populateEvaluationCourseSelectors();
+    if (isStudent()) renderStudentEvaluations(); else renderAdminEvaluations();
   } catch (error) { container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`; }
 }
+
+function setEvaluationTab(tab) {
+  AppState.evaluationTab = tab;
+  document.querySelectorAll('[data-evaluation-tab]').forEach((button) => button.classList.toggle('active', button.dataset.evaluationTab === tab));
+  document.getElementById('createEvaluationButton').classList.toggle('d-none', isStudent() || tab !== 'evaluations');
+  document.getElementById('createForumButton').classList.toggle('d-none', isStudent() || tab !== 'forums');
+  document.getElementById('evaluationAdminFilters').classList.toggle('d-none', isStudent() || tab !== 'evaluations');
+  loadEvaluations();
+}
+
+function populateEvaluationCourseSelectors() {
+  const courses = AppState.cursos || [];
+  const options = courses.map((course) => `<option value="${course.id}">${escapeHtml(course.nombre)}</option>`).join('');
+  ['evaluationCourse', 'forumCourse'].forEach((id) => { const select = document.getElementById(id); const current = select.value; select.innerHTML = `<option value="">Seleccionar curso</option>${options}`; select.value = current; });
+  const filter = document.getElementById('evaluationCourseFilter');
+  const currentFilter = filter.value; filter.innerHTML = `<option value="">Todos los cursos</option>${options}`; filter.value = currentFilter;
+}
+
+function renderAdminEvaluations() {
+  const items = AppState.evaluaciones;
+  document.getElementById('evaluationPageTitle').textContent = 'Evaluaciones';
+  document.getElementById('evaluationMetrics').innerHTML = `<div><span>Creadas</span><strong>${items.length}</strong></div><div><span>Publicadas</span><strong>${items.filter((item) => item.estado === 'Publicada').length}</strong></div><div><span>Respuestas</span><strong>${items.reduce((sum, item) => sum + Number(item.estudiantes_respondieron || 0), 0)}</strong></div><div><span>Promedio</span><strong>${items.length ? Math.round(items.reduce((sum, item) => sum + Number(item.promedio || 0), 0) / items.length) : 0}%</strong></div>`;
+  const container = document.getElementById('evaluationsContent'); container.className = items.length ? 'evaluation-admin-list' : 'empty-state';
+  container.innerHTML = items.length ? items.map((item) => `<article class="evaluation-admin-card"><div class="evaluation-card-icon"><i class="fa-solid fa-clipboard-check"></i></div><div class="evaluation-card-main"><div class="d-flex flex-wrap gap-2 mb-2"><span class="badge ${item.estado === 'Publicada' ? 'text-bg-success' : 'badge-soft'}">${escapeHtml(item.estado)}</span>${item.obligatoria ? '<span class="badge text-bg-warning"><i class="fa-solid fa-lock me-1"></i>Obligatoria</span>' : ''}</div><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.curso.nombre)}${item.modulo ? ` / ${escapeHtml(item.modulo.nombre)}` : ''}</p><div class="evaluation-card-stats"><span>${item.cantidad_preguntas || 0} preguntas</span><span>${item.estudiantes_respondieron || 0} respuestas</span><span>${item.promedio || 0}% promedio</span></div></div><div class="evaluation-card-actions"><button class="btn btn-outline-light btn-sm" onclick="openEvaluationModal(${item.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-outline-info btn-sm" onclick="showEvaluationResults(${item.id})"><i class="fa-solid fa-chart-column"></i></button><button class="btn btn-outline-light btn-sm" onclick="duplicateEvaluation(${item.id})"><i class="fa-solid fa-copy"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteEvaluation(${item.id})"><i class="fa-solid fa-trash"></i></button></div></article>`).join('') : '<i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><strong>No hay evaluaciones</strong><span>Crea la primera evaluacion desde este apartado.</span>';
+}
+
+function renderStudentEvaluations() {
+  const items = AppState.evaluaciones;
+  document.getElementById('evaluationPageTitle').textContent = 'Mis evaluaciones';
+  document.getElementById('evaluationPageDescription').textContent = 'Responde tus actividades pendientes y consulta tus resultados.';
+  const pending = items.filter((item) => ['Pendiente', 'EnProgreso', 'Desaprobado'].includes(item.estado_estudiante)).length;
+  document.getElementById('evaluationMetrics').innerHTML = `<div><span>Asignadas</span><strong>${items.length}</strong></div><div><span>Pendientes</span><strong>${pending}</strong></div><div><span>Aprobadas</span><strong>${items.filter((item) => item.estado_estudiante === 'Aprobado').length}</strong></div><div><span>Por calificar</span><strong>${items.filter((item) => item.estado_estudiante === 'PendienteCalificacion').length}</strong></div>`;
+  const container = document.getElementById('evaluationsContent'); container.className = items.length ? 'student-evaluation-grid' : 'empty-state';
+  container.innerHTML = items.length ? items.map((item) => { const attempt = item.ultimo_intento; const finished = attempt && ['Aprobado','Desaprobado','PendienteCalificacion'].includes(attempt.estado); const disabled = item.estado_estudiante === 'Vencida' && !attempt; return `<article class="student-evaluation-card"><div class="student-evaluation-top"><span class="evaluation-type-icon"><i class="fa-solid fa-list-check"></i></span><span class="badge ${item.obligatoria ? 'text-bg-warning' : 'badge-soft'}">${item.obligatoria ? 'Obligatoria' : 'Opcional'}</span></div><span class="course-category">${escapeHtml(item.curso.nombre)}</span><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.descripcion || 'Evaluacion del curso')}</p><div class="student-evaluation-meta"><span><i class="fa-regular fa-calendar"></i>${item.fecha_limite ? formatDate(item.fecha_limite) : 'Sin fecha limite'}</span><span><i class="fa-solid fa-rotate"></i>${item.intentos_permitidos} intento(s)</span></div>${attempt ? `<div class="evaluation-result-strip"><span>${escapeHtml(attempt.estado)}</span><strong>${Number(attempt.porcentaje || 0)}%</strong></div>` : ''}<button class="btn student-course-primary" ${disabled ? 'disabled' : ''} onclick="${finished ? `viewEvaluationResult(${item.id})` : `takeEvaluation(${item.id})`}">${disabled ? 'Evaluacion vencida' : finished ? 'Ver resultado' : attempt ? 'Continuar evaluacion' : 'Responder evaluacion'}</button></article>`; }).join('') : '<i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><strong>No tienes evaluaciones asignadas</strong>';
+}
+
+async function openEvaluationModal(id = null) {
+  document.getElementById('evaluationForm').reset(); document.getElementById('evaluationId').value = id || ''; AppState.evaluationQuestions = [];
+  populateEvaluationCourseSelectors();
+  if (id) { const item = await EvaluacionesService.obtener(id); AppState.evaluationHasAttempts = Number(item.cantidad_intentos || 0) > 0; document.getElementById('evaluationModalTitle').textContent = 'Editar evaluacion'; document.getElementById('evaluationTitle').value = item.titulo; document.getElementById('evaluationDescription').value = item.descripcion || ''; document.getElementById('evaluationCourse').value = item.curso_id; await loadEvaluationLocations(); document.getElementById('evaluationModule').value = item.modulo_id || ''; await loadEvaluationLessons(); document.getElementById('evaluationLesson').value = item.leccion_id || ''; document.getElementById('evaluationLocation').value = item.ubicacion; document.getElementById('evaluationStatus').value = item.estado; document.getElementById('evaluationAttempts').value = item.intentos_permitidos; document.getElementById('evaluationPassing').value = item.puntaje_minimo; document.getElementById('evaluationTime').value = item.tiempo_limite_min || ''; document.getElementById('evaluationRequired').checked = item.obligatoria; document.getElementById('evaluationBlocks').checked = item.bloquea_avance; document.getElementById('evaluationRetry').checked = item.permitir_reintentos; document.getElementById('evaluationUnlock').value = item.condicion_desbloqueo; document.getElementById('evaluationBlockMessage').value = item.mensaje_bloqueo || ''; AppState.evaluationQuestions = item.preguntas || []; } else { AppState.evaluationHasAttempts = false; document.getElementById('evaluationModalTitle').textContent = 'Nueva evaluacion'; }
+  const evaluationSettings = id ? (AppState.evaluaciones.find((evaluation) => Number(evaluation.id) === Number(id)) || {}) : {};
+  document.getElementById('evaluationShowResult').checked = evaluationSettings.mostrar_resultado !== false;
+  document.getElementById('evaluationShowCorrect').checked = Boolean(evaluationSettings.mostrar_correctas);
+  document.getElementById('evaluationFeedback').checked = evaluationSettings.permitir_retroalimentacion !== false;
+  document.getElementById('evaluationRandomQuestions').checked = Boolean(evaluationSettings.preguntas_aleatorias);
+  document.getElementById('evaluationRandomOptions').checked = Boolean(evaluationSettings.alternativas_aleatorias);
+  renderEvaluationQuestions();
+  if (AppState.evaluationHasAttempts) {
+    const builder = document.getElementById('evaluationQuestionsBuilder');
+    builder.insertAdjacentHTML('afterbegin', '<div class="alert alert-warning">Las preguntas estan bloqueadas porque ya existen intentos. Puedes editar la configuracion general sin perder resultados.</div>');
+    builder.querySelectorAll('input,select,textarea,button').forEach((element) => { element.disabled = true; });
+  }
+  AppState.evaluationModal.show();
+}
+
+async function loadEvaluationLocations() { const courseId = document.getElementById('evaluationCourse').value; const moduleSelect = document.getElementById('evaluationModule'); moduleSelect.innerHTML = '<option value="">Opcional</option>'; document.getElementById('evaluationLesson').innerHTML = '<option value="">Opcional</option>'; if (!courseId) return; const course = await CursosService.obtener(courseId); moduleSelect.innerHTML += (course.modulos || []).map((module) => `<option value="${module.id}">${escapeHtml(module.nombre)}</option>`).join(''); AppState.evaluationCourseStructure = course; }
+async function loadEvaluationLessons() { const moduleId = Number(document.getElementById('evaluationModule').value); const module = AppState.evaluationCourseStructure && AppState.evaluationCourseStructure.modulos.find((item) => item.id === moduleId); document.getElementById('evaluationLesson').innerHTML = '<option value="">Opcional</option>' + (module ? module.lecciones.map((lesson) => `<option value="${lesson.id}">${escapeHtml(lesson.titulo)}</option>`).join('') : ''); }
+function addEvaluationQuestion() { AppState.evaluationQuestions.push({ enunciado: '', tipo: 'OpcionUnica', puntaje: 1, opciones: [{ texto: '', es_correcta: true }, { texto: '', es_correcta: false }] }); renderEvaluationQuestions(); }
+function renderEvaluationQuestions() { const container = document.getElementById('evaluationQuestionsBuilder'); container.innerHTML = AppState.evaluationQuestions.length ? AppState.evaluationQuestions.map((question, index) => `<article class="question-builder-card" data-question-index="${index}"><div class="question-builder-top"><span>${index + 1}</span><input class="form-control question-enunciado" value="${escapeHtml(question.enunciado || '')}" placeholder="Escribe el enunciado"><select class="form-select question-tipo" onchange="changeQuestionType(${index},this.value)">${['OpcionUnica','OpcionMultiple','VerdaderoFalso','TextoCorto','TextoLargo'].map((type) => `<option ${question.tipo === type ? 'selected' : ''}>${type}</option>`).join('')}</select><input class="form-control question-score" type="number" min="0" value="${question.puntaje || 1}" title="Puntaje"><button class="btn btn-outline-danger" type="button" onclick="removeEvaluationQuestion(${index})"><i class="fa-solid fa-trash"></i></button></div>${renderQuestionOptions(question, index)}<textarea class="form-control question-feedback mt-2" rows="2" placeholder="Explicacion o guia para el evaluador">${escapeHtml(question.explicacion || question.guia_instructor || '')}</textarea></article>`).join('') : '<div class="empty-state">Agrega al menos una pregunta.</div>'; }
+function renderQuestionOptions(question, index) { if (['TextoCorto','TextoLargo'].includes(question.tipo)) return '<div class="question-open-hint"><i class="fa-solid fa-user-check"></i>Esta pregunta requiere calificacion manual.</div>'; const options = question.tipo === 'VerdaderoFalso' ? (question.opciones && question.opciones.length ? question.opciones : [{ texto:'Verdadero',es_correcta:true },{ texto:'Falso',es_correcta:false }]) : question.opciones || []; return `<div class="question-options">${options.map((option, optionIndex) => `<label><input class="form-check-input question-correct" type="${question.tipo === 'OpcionMultiple' ? 'checkbox' : 'radio'}" name="correct-${index}" ${option.es_correcta ? 'checked' : ''}><input class="form-control question-option-text" value="${escapeHtml(option.texto || '')}" ${question.tipo === 'VerdaderoFalso' ? 'readonly' : ''}><button class="btn btn-sm btn-outline-danger" type="button" onclick="removeQuestionOption(${index},${optionIndex})" ${question.tipo === 'VerdaderoFalso' ? 'disabled' : ''}><i class="fa-solid fa-xmark"></i></button></label>`).join('')}</div>${question.tipo !== 'VerdaderoFalso' ? `<button class="btn btn-sm btn-outline-info mt-2" type="button" onclick="addQuestionOption(${index})">Agregar alternativa</button>` : ''}`; }
+function syncEvaluationQuestions() { document.querySelectorAll('.question-builder-card').forEach((card) => { const index = Number(card.dataset.questionIndex); const question = AppState.evaluationQuestions[index]; question.enunciado = card.querySelector('.question-enunciado').value.trim(); question.tipo = card.querySelector('.question-tipo').value; question.puntaje = Number(card.querySelector('.question-score').value || 0); question.explicacion = card.querySelector('.question-feedback').value.trim(); const optionRows = card.querySelectorAll('.question-options label'); if (optionRows.length) question.opciones = Array.from(optionRows).map((row) => ({ texto: row.querySelector('.question-option-text').value.trim(), es_correcta: row.querySelector('.question-correct').checked })); }); }
+function changeQuestionType(index, type) { syncEvaluationQuestions(); const question = AppState.evaluationQuestions[index]; question.tipo = type; if (type === 'VerdaderoFalso') question.opciones = [{ texto:'Verdadero',es_correcta:true },{ texto:'Falso',es_correcta:false }]; if (['OpcionUnica','OpcionMultiple'].includes(type) && (!question.opciones || question.opciones.length < 2)) question.opciones = [{texto:'',es_correcta:true},{texto:'',es_correcta:false}]; renderEvaluationQuestions(); }
+function removeEvaluationQuestion(index) { syncEvaluationQuestions(); AppState.evaluationQuestions.splice(index,1); renderEvaluationQuestions(); } function addQuestionOption(index) { syncEvaluationQuestions(); AppState.evaluationQuestions[index].opciones.push({texto:'',es_correcta:false}); renderEvaluationQuestions(); } function removeQuestionOption(index, optionIndex) { syncEvaluationQuestions(); if (AppState.evaluationQuestions[index].opciones.length <= 2) return; AppState.evaluationQuestions[index].opciones.splice(optionIndex,1); renderEvaluationQuestions(); }
+async function saveEvaluation(event) { event.preventDefault(); syncEvaluationQuestions(); const id = document.getElementById('evaluationId').value; const payload = { titulo: document.getElementById('evaluationTitle').value.trim(), descripcion: document.getElementById('evaluationDescription').value.trim(), curso_id: Number(document.getElementById('evaluationCourse').value), modulo_id: document.getElementById('evaluationModule').value || null, leccion_id: document.getElementById('evaluationLesson').value || null, ubicacion: document.getElementById('evaluationLocation').value, estado: document.getElementById('evaluationStatus').value, intentos_permitidos: Number(document.getElementById('evaluationAttempts').value), puntaje_minimo: Number(document.getElementById('evaluationPassing').value), tiempo_limite_min: Number(document.getElementById('evaluationTime').value) || null, fecha_inicio: document.getElementById('evaluationStart').value || null, fecha_limite: document.getElementById('evaluationDeadline').value || null, obligatoria: document.getElementById('evaluationRequired').checked, bloquea_avance: document.getElementById('evaluationBlocks').checked, permitir_reintentos: document.getElementById('evaluationRetry').checked, condicion_desbloqueo: document.getElementById('evaluationUnlock').value, mensaje_bloqueo: document.getElementById('evaluationBlockMessage').value.trim(), mostrar_resultado: document.getElementById('evaluationShowResult').checked, mostrar_correctas: document.getElementById('evaluationShowCorrect').checked, permitir_retroalimentacion: document.getElementById('evaluationFeedback').checked, preguntas_aleatorias: document.getElementById('evaluationRandomQuestions').checked, alternativas_aleatorias: document.getElementById('evaluationRandomOptions').checked }; if (!AppState.evaluationHasAttempts) payload.preguntas = AppState.evaluationQuestions; try { if (id) await EvaluacionesService.actualizar(id,payload); else await EvaluacionesService.crear(payload); AppState.evaluationModal.hide(); await loadEvaluations(); toastSuccess('Evaluacion guardada'); } catch(error) { Swal.fire('No se pudo guardar',error.message,'error'); } }
+async function duplicateEvaluation(id) { try { await EvaluacionesService.duplicar(id); await loadEvaluations(); toastSuccess('Evaluacion duplicada'); } catch(error){ Swal.fire('No se pudo duplicar',error.message,'error'); } }
+async function deleteEvaluation(id) { if (!(await confirmAction('Eliminar evaluacion','Se eliminaran preguntas e intentos asociados.'))) return; try { await EvaluacionesService.eliminar(id); await loadEvaluations(); } catch(error){ Swal.fire('No se pudo eliminar',error.message,'error'); } }
+async function showEvaluationResults(id) {
+  try {
+    const data = await EvaluacionesService.resultados(id);
+    const reviews = data.intentos.flatMap((attempt) => (attempt.respuestas || []).filter((answer) => answer.requiere_revision).map((answer) => ({ ...answer, estudiante: attempt.estudiante })));
+    const summary = data.intentos.map((attempt) => `<div><strong>${escapeHtml(attempt.estudiante.Nombres || attempt.estudiante.usuario)}</strong><span>${attempt.estado} / ${attempt.porcentaje}%</span></div>`).join('');
+    const grading = reviews.map((answer) => `<article><strong>${escapeHtml(answer.estudiante.Nombres || answer.estudiante.usuario)}</strong><p>${escapeHtml(answer.pregunta.enunciado)}</p><blockquote>${escapeHtml(answer.respuesta_texto || 'Sin respuesta')}</blockquote><div><input id="grade-score-${answer.id}" class="form-control" type="number" min="0" max="${answer.pregunta.puntaje}" value="${answer.puntaje_obtenido ?? 0}"><input id="grade-feedback-${answer.id}" class="form-control" placeholder="Retroalimentacion" value="${escapeHtml(answer.retroalimentacion || '')}"><button class="btn btn-sm btn-gold" onclick="gradeManualAnswer(${answer.id})">Guardar nota</button></div></article>`).join('');
+    const html = data.intentos.length ? `<div class="result-list">${summary}</div>${reviews.length ? `<h4 class="mt-4 text-start">Respuestas para calificar</h4><div class="manual-grade-list">${grading}</div>` : ''}` : '<div class="empty-state">Aun no hay respuestas.</div>';
+    Swal.fire({ title: `Resultados: ${data.evaluacion.titulo}`, width: 1000, html, showConfirmButton: false, showCloseButton: true });
+  } catch(error) { Swal.fire('No se pudieron cargar resultados', error.message, 'error'); }
+}
+async function gradeManualAnswer(id) { try { await EvaluacionesService.calificarRespuesta(id,{puntaje:Number(document.getElementById(`grade-score-${id}`).value),retroalimentacion:document.getElementById(`grade-feedback-${id}`).value}); toastSuccess('Respuesta calificada'); Swal.close(); } catch(error){ Swal.fire('No se pudo calificar',error.message,'error'); } }
+
+async function takeEvaluation(id) { try { const data = await EvaluacionesService.iniciar(id); AppState.currentAttempt = data; const evaluation = data.evaluacion; document.getElementById('takeEvaluationTitle').textContent = evaluation.titulo; document.getElementById('takeEvaluationMeta').textContent = `${evaluation.curso.nombre} / Intento ${data.intento.numero_intento} de ${evaluation.intentos_permitidos}`; document.getElementById('takeEvaluationBody').innerHTML = evaluation.preguntas.map((question,index) => `<article class="take-question" data-question-id="${question.id}" data-question-type="${question.tipo}"><div class="take-question-heading"><span>${index+1}</span><div><h3>${escapeHtml(question.enunciado)}</h3><small>${question.puntaje} punto(s)</small></div></div>${renderStudentQuestion(question)}</article>`).join(''); AppState.takeEvaluationModal.show(); } catch(error){ Swal.fire('No se pudo iniciar',error.message,'error'); } }
+function renderStudentQuestion(question) { if (question.tipo === 'TextoLargo') return '<textarea class="form-control student-answer-text" rows="6" required></textarea>'; if (question.tipo === 'TextoCorto') return '<input class="form-control student-answer-text" required>'; return `<div class="student-answer-options">${question.opciones.map((option) => `<label><input class="form-check-input student-answer-option" type="${question.tipo === 'OpcionMultiple' ? 'checkbox' : 'radio'}" name="question-${question.id}" value="${option.id}"><span>${escapeHtml(option.texto)}</span></label>`).join('')}</div>`; }
+async function submitEvaluationAttempt(event) { event.preventDefault(); const answers = Array.from(document.querySelectorAll('.take-question')).map((card) => { const type = card.dataset.questionType; const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value)); return { pregunta_id: Number(card.dataset.questionId), opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null, opciones_ids: type === 'OpcionMultiple' ? checked : null, respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null }; }); try { const result = await EvaluacionesService.enviar(AppState.currentAttempt.evaluacion.id,AppState.currentAttempt.intento.id,answers); AppState.takeEvaluationModal.hide(); await loadEvaluations(); Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : result.estado === 'PendienteCalificacion' ? 'Enviada para revision' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info'); } catch(error){ Swal.fire('No se pudo enviar',error.message,'error'); } }
+function viewEvaluationResult(id) { const item = AppState.evaluaciones.find((evaluation) => evaluation.id === id); const attempt = item && item.ultimo_intento; Swal.fire({ icon: attempt && attempt.estado === 'Aprobado' ? 'success' : 'info', title: item ? item.titulo : 'Resultado', html: attempt ? `<p>Estado: <strong>${escapeHtml(attempt.estado)}</strong></p><div class="display-4">${Number(attempt.porcentaje || 0)}%</div>` : 'Sin resultado disponible' }); }
+
+function renderForums() { const items = AppState.foros; document.getElementById('evaluationPageTitle').textContent = isStudent() ? 'Mis foros' : 'Foros evaluables'; document.getElementById('evaluationMetrics').innerHTML = `<div><span>Foros</span><strong>${items.length}</strong></div><div><span>Publicados</span><strong>${items.filter((item)=>item.estado==='Publicado').length}</strong></div>`; const container=document.getElementById('evaluationsContent'); container.className=items.length?'evaluation-admin-list':'empty-state'; container.innerHTML=items.length?items.map((item)=>`<article class="evaluation-admin-card"><div class="evaluation-card-icon"><i class="fa-solid fa-comments"></i></div><div class="evaluation-card-main"><div class="d-flex gap-2"><span class="badge ${item.estado==='Publicado'?'text-bg-success':'badge-soft'}">${item.estado}</span>${item.obligatorio?'<span class="badge text-bg-warning">Obligatorio</span>':''}</div><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.curso.nombre)}</p><div class="evaluation-card-stats"><span>${item.respuestas&&item.respuestas[0]?item.respuestas[0].count:0} respuestas</span><span>${item.condicion_desbloqueo}</span></div></div><div class="evaluation-card-actions">${isStudent()?`<button class="btn btn-gold" onclick="openForumResponse(${item.id})">Responder foro</button>`:`<button class="btn btn-outline-light btn-sm" onclick="openForumModal(${item.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-outline-info btn-sm" onclick="showForumResults(${item.id})"><i class="fa-solid fa-star"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteForum(${item.id})"><i class="fa-solid fa-trash"></i></button>`}</div></article>`).join(''):'<i class="fa-solid fa-comments fa-2x mb-3"></i><strong>No hay foros disponibles</strong>'; }
+async function openForumModal(id=null) { document.getElementById('forumForm').reset(); document.getElementById('forumId').value=id||''; populateEvaluationCourseSelectors(); if(id){const item=AppState.foros.find((forum)=>forum.id===id);if(item){document.getElementById('forumTitle').value=item.titulo;document.getElementById('forumCourse').value=item.curso_id;document.getElementById('forumStatus').value=item.estado;document.getElementById('forumDescription').value=item.descripcion;document.getElementById('forumInstructions').value=item.instrucciones||'';document.getElementById('forumFileUrl').value=item.archivo_url||'';document.getElementById('forumFileName').value=item.archivo_nombre||'';document.getElementById('forumRequired').checked=item.obligatorio;document.getElementById('forumBlocks').checked=item.bloquea_avance;document.getElementById('forumUnlock').value=item.condicion_desbloqueo;document.getElementById('forumStars').value=item.minimo_estrellas||1;}} AppState.forumModal.show(); }
+async function saveForum(event) { event.preventDefault(); const id=document.getElementById('forumId').value; const payload={titulo:document.getElementById('forumTitle').value.trim(),curso_id:Number(document.getElementById('forumCourse').value),descripcion:document.getElementById('forumDescription').value.trim(),instrucciones:document.getElementById('forumInstructions').value.trim(),estado:document.getElementById('forumStatus').value,ubicacion:'FinCurso',archivo_url:document.getElementById('forumFileUrl').value.trim()||null,archivo_nombre:document.getElementById('forumFileName').value.trim()||null,obligatorio:document.getElementById('forumRequired').checked,bloquea_avance:document.getElementById('forumBlocks').checked,condicion_desbloqueo:document.getElementById('forumUnlock').value,minimo_estrellas:Number(document.getElementById('forumStars').value||1)}; try{const saved=id?await EvaluacionesService.actualizarForo(id,payload):await EvaluacionesService.crearForo(payload);const file=document.getElementById('forumFile').files[0];if(file)await EvaluacionesService.subirArchivoForo(saved.id,file);AppState.forumModal.hide();await loadEvaluations();toastSuccess('Foro guardado');}catch(error){Swal.fire('No se pudo guardar',error.message,'error');} }
+async function deleteForum(id){if(!(await confirmAction('Eliminar foro','Se eliminaran sus respuestas y calificaciones.')))return;try{await EvaluacionesService.eliminarForo(id);await loadEvaluations();}catch(error){Swal.fire('No se pudo eliminar',error.message,'error');}}
+function openForumResponse(id) { const forum=AppState.foros.find((item)=>item.id===id); if(!forum)return; document.getElementById('forumResponseId').value=id;document.getElementById('forumResponseTitle').textContent=forum.titulo;document.getElementById('forumResponseCase').innerHTML=`<p>${escapeHtml(forum.descripcion)}</p>${forum.archivo_url?`<a class="btn btn-outline-info btn-sm" href="${escapeHtml(forum.archivo_url)}" target="_blank">${escapeHtml(forum.archivo_nombre||'Ver documento')}</a>`:''}`;AppState.forumResponseModal.show(); }
+async function submitForumResponse(event){event.preventDefault();try{await EvaluacionesService.responderForo(document.getElementById('forumResponseId').value,{texto:document.getElementById('forumResponseText').value.trim()});AppState.forumResponseModal.hide();await loadEvaluations();toastSuccess('Respuesta enviada');}catch(error){Swal.fire('No se pudo enviar',error.message,'error');}}
+async function showForumResults(id){try{const data=await EvaluacionesService.resultadosForo(id);Swal.fire({title:data.foro.titulo,width:900,html:data.respuestas.length?`<div class="forum-review-list">${data.respuestas.map((response)=>`<article><strong>${escapeHtml(response.estudiante.Nombres||response.estudiante.usuario)}</strong><p>${escapeHtml(response.texto)}</p><div class="forum-grade-controls"><input id="forum-stars-${response.id}" class="form-control" type="number" min="1" max="5" value="${response.estrellas||3}"><input id="forum-feedback-${response.id}" class="form-control" placeholder="Retroalimentacion" value="${escapeHtml(response.retroalimentacion||'')}"><button class="btn btn-sm btn-gold" onclick="gradeForumResponse(${response.id})">Guardar</button></div></article>`).join('')}</div>`:'<div class="empty-state">Sin respuestas</div>',showConfirmButton:false,showCloseButton:true});}catch(error){Swal.fire('No se pudieron cargar respuestas',error.message,'error');}}
+async function gradeForumResponse(id){try{await EvaluacionesService.calificarForo(id,{estrellas:Number(document.getElementById(`forum-stars-${id}`).value),retroalimentacion:document.getElementById(`forum-feedback-${id}`).value});toastSuccess('Foro calificado');Swal.close();}catch(error){Swal.fire('No se pudo calificar',error.message,'error');}}
 
 async function loadStudentCertificates() {
   const container = document.getElementById('certificatesContent');
@@ -971,19 +1104,22 @@ function renderStudentCoursePlayer() {
     return;
   }
   const cover = curso.imagen_portada_url ? `style="background-image:linear-gradient(90deg,rgba(2,13,31,.94),rgba(2,20,42,.55)),url('${escapeHtml(curso.imagen_portada_url)}')"` : '';
+  const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
   document.getElementById('coursePreviewBody').innerHTML = `
     <div class="student-course-player">
       <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
       <div class="student-player-layout">
-        <aside class="student-player-sidebar"><div class="student-player-sidebar-title">Contenido del curso</div>${renderStudentCourseOutline()}</aside>
+        <aside class="student-player-sidebar"><div class="student-player-sidebar-title">Contenido del curso</div>${renderStudentJourneyOutline()}</aside>
         <main class="student-player-content">
-          <div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div>
-          <div class="lesson-content">${renderLessonPreview(leccion)}</div>
-          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+          ${activityContent}
+          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid ${leccion.tipo_actividad === 'Foro' ? 'fa-comments' : 'fa-list-check'} me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
         </main>
       </div>
     </div>`;
 }
+
+function renderJourneyActivity(activity) { return `<div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid ${activity.tipo_actividad === 'Foro' ? 'fa-comments' : 'fa-clipboard-check'}"></i></div><div><span class="eyebrow">${activity.tipo_actividad === 'Foro' ? 'FORO EVALUABLE' : 'EVALUACION'}${activity.obligatoria ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p>${activity.completada ? '<span class="text-success"><i class="fa-solid fa-circle-check me-2"></i>Actividad completada</span>' : activity.bloquea_avance ? '<span class="text-warning"><i class="fa-solid fa-lock me-2"></i>Debes completar esta actividad para continuar.</span>' : ''}</div></div>`; }
+function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; AppState.coursePreviewModal.hide(); if (activity.tipo_actividad === 'Foro') { AppState.foros = [activity]; openForumResponse(activity.id); } else takeEvaluation(activity.id); }
 
 function renderStudentCourseOutline() {
   let lastModule = '';
@@ -995,8 +1131,20 @@ function renderStudentCourseOutline() {
   }).join('');
 }
 
-function selectStudentLesson(index) { AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
+function renderStudentJourneyOutline() {
+  let lastModule = '';
+  return AppState.studentLessons.map((item, index) => {
+    const moduleTitle = item.modulo_nombre || 'Modulo';
+    const heading = moduleTitle !== lastModule ? `<div class="student-outline-module">${escapeHtml(moduleTitle)}</div>` : '';
+    lastModule = moduleTitle;
+    const completed = item.completada || (item.progreso && item.progreso.completado);
+    const type = item.es_actividad ? item.tipo_actividad : `${item.tipo_contenido} / ${item.tiempo_estimado_min || 0} min`;
+    return `${heading}<button class="student-outline-step ${index === AppState.studentLessonIndex ? 'active' : ''} ${item.bloqueado ? 'locked' : ''}" type="button" onclick="selectStudentLesson(${index})"><span>${item.bloqueado ? '<i class="fa-solid fa-lock"></i>' : index + 1}</span><div><strong>${escapeHtml(item.titulo)}</strong><small>${escapeHtml(type)}</small></div>${completed ? '<i class="fa-solid fa-circle-check"></i>' : ''}</button>`;
+  }).join('');
+}
 
-function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentCoursePlayer(); }
+function selectStudentLesson(index) { if (AppState.studentLessons[index].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
+
+function navigateStudentLesson(offset) { const target = AppState.studentLessonIndex + offset; if (AppState.studentLessons[target] && AppState.studentLessons[target].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = target; renderStudentCoursePlayer(); }
 async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
 </script>

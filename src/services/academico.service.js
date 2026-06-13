@@ -109,13 +109,36 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
   }
   const progresoMap = new Map(progreso.map((item) => [item.leccion_id, item]));
 
+  let actividades = [];
+  if (publicado) {
+    const evaluacionesService = require('./evaluaciones.service');
+    actividades = await evaluacionesService.courseActivities(Number(id), usuarioId);
+  }
+
+  const lockedLessonIds = new Set();
+  if (publicado && usuarioId && actividades.length) {
+    let locked = false;
+    modulos.forEach((modulo) => {
+      lecciones.filter((leccion) => leccion.modulo_id === modulo.id).forEach((leccion) => {
+        if (locked) lockedLessonIds.add(leccion.id);
+        actividades.filter((actividad) => actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(leccion.id)).forEach((actividad) => {
+          if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
+        });
+      });
+      actividades.filter((actividad) => actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
+        if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
+      });
+    });
+  }
+
   return {
     ...curso,
+    actividades,
     modulos: modulos.map((modulo) => ({
       ...modulo,
       lecciones: lecciones
         .filter((leccion) => leccion.modulo_id === modulo.id)
-        .map((leccion) => ({ ...leccion, progreso: progresoMap.get(leccion.id) || null })),
+        .map((leccion) => lockedLessonIds.has(leccion.id) ? ({ ...leccion, contenido_texto: null, contenido_html: null, url_externa: null, recursos: [], bloqueado: true, progreso: progresoMap.get(leccion.id) || null }) : ({ ...leccion, bloqueado: false, progreso: progresoMap.get(leccion.id) || null })),
     })),
   };
 };

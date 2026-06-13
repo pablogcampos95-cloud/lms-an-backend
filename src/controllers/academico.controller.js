@@ -77,6 +77,10 @@ const completarLeccion = async (req, res) => {
   if (req.user.rol && req.user.rol.nombre === 'Estudiante' && !(await estudianteService.isLessonAssigned(req.user.id, req.params.id))) {
     throw new AppError('Esta leccion no pertenece a un curso asignado', 403);
   }
+  if (req.user.rol && req.user.rol.nombre === 'Estudiante') {
+    const evaluacionesService = require('../services/evaluaciones.service');
+    await evaluacionesService.assertLessonUnlocked(req.user.id, req.params.id);
+  }
   return ok(res, await academicoService.completeLeccion(req.user.id, req.params.id, req.body.completado !== false));
 };
 

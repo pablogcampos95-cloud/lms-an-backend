@@ -48,14 +48,18 @@ const getAssignedCoursesProgress = async (usuarioId) => {
   const completedIds = new Set(progress.filter((item) => item.completado).map((item) => item.leccion_id));
   const moduleCourse = new Map(modules.map((item) => [item.id, item.curso_id]));
 
-  return courses.map((assignment) => {
+  const evaluacionesService = require('./evaluaciones.service');
+  return Promise.all(courses.map(async (assignment) => {
     const courseLessons = lessons.filter((lesson) => moduleCourse.get(lesson.modulo_id) === assignment.curso.id);
-    const completed = courseLessons.filter((lesson) => completedIds.has(lesson.id)).length;
+    const completedLessons = courseLessons.filter((lesson) => completedIds.has(lesson.id)).length;
     const completedMinutes = courseLessons.filter((lesson) => completedIds.has(lesson.id)).reduce((sum, lesson) => sum + Number(lesson.tiempo_estimado_min || 0), 0);
-    const total = courseLessons.length;
+    const activities = await evaluacionesService.courseActivities(assignment.curso.id, usuarioId);
+    const completedActivities = activities.filter((activity) => activity.completada).length;
+    const total = courseLessons.length + activities.length;
+    const completed = completedLessons + completedActivities;
     const avance = total ? Math.round((completed / total) * 100) : 0;
-    return { ...assignment.curso, asignacion_id: assignment.id, assigned_at: assignment.assigned_at, cantidad_modulos: modules.filter((item) => Number(item.curso_id) === Number(assignment.curso.id)).length, total_lecciones: total, lecciones_completadas: completed, minutos_completados: completedMinutes, avance };
-  });
+    return { ...assignment.curso, asignacion_id: assignment.id, assigned_at: assignment.assigned_at, cantidad_modulos: modules.filter((item) => Number(item.curso_id) === Number(assignment.curso.id)).length, total_lecciones: total, lecciones_completadas: completed, total_actividades: activities.length, actividades_completadas: completedActivities, minutos_completados: completedMinutes, avance };
+  }));
 };
 
 const syncCertificates = async (usuarioId, courses) => {
@@ -93,15 +97,8 @@ const getDashboard = async (usuarioId) => {
 };
 
 const getEvaluations = async (usuarioId) => {
-  const courseIds = await getAssignedCourseIds(usuarioId);
-  if (!courseIds.length) return [];
-  const { data: modules, error } = await supabase.from('modulos').select('id,curso_id,curso:cursos(id,nombre)').in('curso_id', courseIds).eq('estado', 'Publicado');
-  throwSupabaseError(error);
-  if (!modules.length) return [];
-  const { data: lessons, error: lessonError } = await supabase.from('lecciones').select('id,modulo_id,titulo,descripcion,tiempo_estimado_min').in('modulo_id', modules.map((item) => item.id)).eq('tipo_contenido', 'Evaluacion').eq('estado', 'Publicado');
-  throwSupabaseError(lessonError);
-  const moduleMap = new Map(modules.map((item) => [item.id, item]));
-  return lessons.map((lesson) => ({ ...lesson, curso: moduleMap.get(lesson.modulo_id).curso }));
+  const evaluacionesService = require('./evaluaciones.service');
+  return evaluacionesService.listStudent(usuarioId);
 };
 
 const getCertificates = async (usuarioId) => {
