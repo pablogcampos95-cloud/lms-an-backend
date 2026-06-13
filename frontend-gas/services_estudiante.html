@@ -1,0 +1,6 @@
+<script>
+const EstudianteService = {
+  async evaluaciones() { return (await ApiService.request('/api/estudiante/evaluaciones')).data || []; },
+  async certificados() { return (await ApiService.request('/api/estudiante/certificados')).data || []; },
+};
+</script>

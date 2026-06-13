@@ -12,6 +12,7 @@ const modulosRoutes = require('./routes/modulos.routes');
 const leccionesRoutes = require('./routes/lecciones.routes');
 const evaluacionesRoutes = require('./routes/evaluaciones.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const estudianteRoutes = require('./routes/estudiante.routes');
 const { notFoundHandler, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/api/modulos', modulosRoutes);
 app.use('/api/lecciones', leccionesRoutes);
 app.use('/api/evaluaciones', evaluacionesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/estudiante', estudianteRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

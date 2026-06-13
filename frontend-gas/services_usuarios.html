@@ -28,6 +28,19 @@ const UsuariosService = {
     return result.data;
   },
 
+  async asignaciones(id) {
+    const result = await ApiService.request(`/api/usuarios/${id}/asignaciones`);
+    return result.data || [];
+  },
+
+  async guardarAsignaciones(id, cursoIds) {
+    const result = await ApiService.request(`/api/usuarios/${id}/asignaciones`, {
+      method: 'PUT',
+      body: JSON.stringify({ curso_ids: cursoIds }),
+    });
+    return result.data;
+  },
+
   async roles() {
     const result = await ApiService.request('/api/roles');
     return result.data;

@@ -1,4 +1,5 @@
 const usuariosService = require('../services/usuarios.service');
+const estudianteService = require('../services/estudiante.service');
 
 const listarUsuarios = async (req, res) => {
   const usuarios = await usuariosService.getUsuarios();
@@ -48,10 +49,21 @@ const eliminarUsuario = async (req, res) => {
   });
 };
 
+const obtenerAsignaciones = async (req, res) => {
+  res.json({ ok: true, data: await estudianteService.getAssignments(req.params.id) });
+};
+
+const guardarAsignaciones = async (req, res) => {
+  const data = await estudianteService.setAssignments(req.params.id, req.body.curso_ids, req.user.id);
+  res.json({ ok: true, message: 'Cursos asignados correctamente', data });
+};
+
 module.exports = {
   listarUsuarios,
   obtenerUsuario,
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario,
+  obtenerAsignaciones,
+  guardarAsignaciones,
 };

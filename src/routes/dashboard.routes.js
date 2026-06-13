@@ -2,6 +2,8 @@ const { Router } = require('express');
 
 const { requireAuth } = require('../middlewares/auth.middleware');
 const { authorizeRoles } = require('../middlewares/role.middleware');
+const asyncHandler = require('../utils/asyncHandler');
+const estudianteService = require('../services/estudiante.service');
 
 const router = Router();
 
@@ -19,12 +21,13 @@ const buildPlaceholderDashboard = (tipo) => ({
 
 router.use(requireAuth);
 
-router.get('/general', (req, res) => {
+router.get('/general', asyncHandler(async (req, res) => {
+  const isStudent = req.user.rol && req.user.rol.nombre === 'Estudiante';
   res.json({
     ok: true,
-    data: buildPlaceholderDashboard('general'),
+    data: isStudent ? await estudianteService.getDashboard(req.user.id) : buildPlaceholderDashboard('general'),
   });
-});
+}));
 
 router.get('/capacitacion', authorizeRoles('Administrador', 'Analista', 'Instructor'), (req, res) => {
   res.json({

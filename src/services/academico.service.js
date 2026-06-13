@@ -61,6 +61,12 @@ const listCursos = async ({ estado, categoria, search } = {}) => {
   }));
 };
 
+const listCursosByIds = async (ids) => {
+  const { data, error } = await supabase.from('cursos').select('*, modulos(count)').in('id', ids).eq('estado', 'Publicado').order('created_at', { ascending: false });
+  throwSupabaseError(error);
+  return data.map((curso) => ({ ...curso, cantidad_modulos: curso.modulos && curso.modulos[0] ? curso.modulos[0].count : 0 }));
+};
+
 const getCurso = async (id) => {
   const { data, error } = await supabase.from('cursos').select('*').eq('id', id).maybeSingle();
   throwSupabaseError(error);
@@ -275,7 +281,7 @@ const completeLeccion = async (usuarioId, leccionId, completado = true) => {
 };
 
 module.exports = {
-  listCursos, getCurso, getCursoEstructura, createCurso, updateCurso, deleteCurso, duplicateCurso,
+  listCursos, listCursosByIds, getCurso, getCursoEstructura, createCurso, updateCurso, deleteCurso, duplicateCurso,
   listModulos, createModulo, updateModulo, deleteModulo, reorderModulo,
   listLecciones, createLeccion, updateLeccion, deleteLeccion, reorderLeccion,
   saveRecurso, completeLeccion,

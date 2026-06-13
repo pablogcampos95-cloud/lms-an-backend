@@ -1,23 +1,23 @@
 <section id="view-evaluaciones" class="view" data-title="Evaluaciones">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div><h1 class="h3 mb-1">Evaluaciones</h1><p class="text-secondary mb-0">Gestiona actividades, cuestionarios y criterios de aprobacion.</p></div>
-    <button class="btn btn-gold" type="button" onclick="showModuleNotice('Nueva evaluacion')"><i class="fa-solid fa-plus me-2"></i>Nueva evaluacion</button>
+    <button id="createEvaluationButton" class="btn btn-gold" type="button" onclick="showModuleNotice('Nueva evaluacion')"><i class="fa-solid fa-plus me-2"></i>Nueva evaluacion</button>
   </div>
   <div class="row g-3 mb-4">
     <div class="col-md-4"><div class="metric-card"><div class="metric-label">Evaluaciones creadas</div><div class="metric-value">0</div></div></div>
     <div class="col-md-4"><div class="metric-card"><div class="metric-label">Publicadas</div><div class="metric-value">0</div></div></div>
     <div class="col-md-4"><div class="metric-card"><div class="metric-label">Intentos registrados</div><div class="metric-value">0</div></div></div>
   </div>
-  <div class="data-panel"><div class="d-flex flex-wrap gap-3 mb-3"><input class="form-control flex-grow-1" placeholder="Buscar evaluacion"><select class="form-select admin-filter"><option>Todos los estados</option><option>Borrador</option><option>Publicado</option><option>Inactivo</option></select></div><div class="empty-state"><i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><div class="fw-semibold">Todavia no hay evaluaciones</div><small>Crea evaluaciones desde aqui o como un paso dentro de un curso.</small></div></div>
+  <div class="data-panel"><div id="evaluationsContent" class="empty-state"><i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><div class="fw-semibold">Todavia no hay evaluaciones</div><small>Crea evaluaciones desde aqui o como un paso dentro de un curso.</small></div></div>
 </section>
 
 <section id="view-certificados" class="view" data-title="Certificados">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div><h1 class="h3 mb-1">Certificados</h1><p class="text-secondary mb-0">Administra plantillas y certificados emitidos a estudiantes.</p></div>
-    <button class="btn btn-gold" type="button" onclick="showModuleNotice('Nueva plantilla de certificado')"><i class="fa-solid fa-plus me-2"></i>Nueva plantilla</button>
+    <button id="createCertificateButton" class="btn btn-gold" type="button" onclick="showModuleNotice('Nueva plantilla de certificado')"><i class="fa-solid fa-plus me-2"></i>Nueva plantilla</button>
   </div>
   <div class="row g-3 mb-4"><div class="col-md-4"><div class="metric-card"><div class="metric-label">Plantillas</div><div class="metric-value">0</div></div></div><div class="col-md-4"><div class="metric-card"><div class="metric-label">Certificados emitidos</div><div class="metric-value">0</div></div></div><div class="col-md-4"><div class="metric-card"><div class="metric-label">Este mes</div><div class="metric-value">0</div></div></div></div>
-  <div class="data-panel"><div class="empty-state"><i class="fa-solid fa-award fa-2x mb-3"></i><div class="fw-semibold">No hay certificados emitidos</div><small>Los certificados apareceran cuando los estudiantes completen cursos certificados.</small></div></div>
+  <div class="data-panel"><div id="certificatesContent" class="empty-state"><i class="fa-solid fa-award fa-2x mb-3"></i><div class="fw-semibold">No hay certificados emitidos</div><small>Los certificados apareceran cuando los estudiantes completen cursos certificados.</small></div></div>
 </section>
 
 <section id="view-reportes" class="view" data-title="Reportes">

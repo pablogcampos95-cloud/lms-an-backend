@@ -13,6 +13,7 @@ const AppState = {
   coursePreviewModal: null,
   studentLessons: [],
   studentLessonIndex: 0,
+  dashboardData: null,
 };
 
 const MENUS = {
@@ -41,10 +42,10 @@ const MENUS = {
     ['avance', 'fa-bars-progress', 'Avance estudiantes'],
   ],
   Estudiante: [
+    ['dashboard', 'fa-chart-line', 'Inicio'],
     ['cursos', 'fa-graduation-cap', 'Mis cursos'],
     ['evaluaciones', 'fa-clipboard-check', 'Mis evaluaciones'],
     ['certificados', 'fa-award', 'Mis certificados'],
-    ['dashboard', 'fa-chart-line', 'Mi avance'],
   ],
 };
 
@@ -128,10 +129,37 @@ async function startSession(usuario) {
   document.getElementById('sessionRole').textContent = usuario.rol ? usuario.rol.nombre : 'Sin rol';
   document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   renderMenu();
+  configureRoleInterface();
   showApp();
   renderCurrentPlan();
   showView('dashboard');
-  await Promise.allSettled([loadDashboard(), loadRoles(), loadUsers(), loadCourses()]);
+  await Promise.allSettled(isStudent() ? [loadDashboard(), loadCourses()] : [loadDashboard(), loadRoles(), loadUsers(), loadCourses()]);
+}
+
+function isStudent() {
+  return Boolean(AppState.usuario && AppState.usuario.rol && AppState.usuario.rol.nombre === 'Estudiante');
+}
+
+function configureRoleInterface() {
+  const student = isStudent();
+  document.getElementById('createEvaluationButton').classList.toggle('d-none', student);
+  document.getElementById('createCertificateButton').classList.toggle('d-none', student);
+  document.querySelector('#view-evaluaciones .row').classList.toggle('d-none', student);
+  document.querySelector('#view-certificados .row').classList.toggle('d-none', student);
+  document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
+  const navButtons = document.querySelectorAll('.main-navigation button');
+  navButtons.forEach((button) => {
+    const label = button.textContent.trim();
+    if (student && label === 'Categorias') button.classList.add('d-none');
+    else button.classList.remove('d-none');
+  });
+  document.querySelectorAll('#view-dashboard .section-heading').forEach((heading) => {
+    const demoSection = heading.textContent.includes('DESARROLLA NUEVAS HABILIDADES') || heading.textContent.includes('CRECE PASO A PASO');
+    if (demoSection) {
+      heading.classList.toggle('d-none', student);
+      if (heading.nextElementSibling) heading.nextElementSibling.classList.toggle('d-none', student);
+    }
+  });
 }
 
 function showLogin() {
@@ -182,6 +210,8 @@ function showView(viewName) {
 
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
   if (viewName === 'plan') renderCurrentPlan();
+  if (isStudent() && viewName === 'evaluaciones') loadStudentEvaluations();
+  if (isStudent() && viewName === 'certificados') loadStudentCertificates();
 }
 
 function renderCurrentPlan() {
@@ -215,7 +245,17 @@ async function loadDashboard() {
 
   try {
     const data = await DashboardService.general();
-    const metrics = [
+    AppState.dashboardData = data;
+    const metrics = isStudent() ? [
+      ['Cursos asignados', data.cursosAsignados],
+      ['Completados', data.cursosCompletados],
+      ['Pendientes', data.cursosPendientes],
+      ['Horas completadas', data.horasCapacitacion],
+      ['Certificados', data.certificadosObtenidos],
+      ['Pasos completados', data.pasosCompletados],
+      ['Total de pasos', data.pasosTotales],
+      ['Avance general', `${data.avanceGeneral}%`],
+    ] : [
       ['Cursos asignados', data.cursosAsignados],
       ['Completados', data.cursosCompletados],
       ['Pendientes', data.cursosPendientes],
@@ -243,9 +283,76 @@ async function loadDashboard() {
     `).join('');
 
     renderProgressChart(data);
+    if (isStudent()) renderStudentDashboard(data);
   } catch (error) {
     container.innerHTML = '<div class="col-12"><div class="alert alert-warning mb-0">No se pudo cargar el dashboard.</div></div>';
   }
+}
+
+function renderStudentDashboard(data) {
+  const featured = data.cursoDestacado;
+  const hero = document.querySelector('.learning-hero-content');
+  const description = hero.querySelector('p');
+  document.getElementById('profileWelcomeName').textContent = AppState.usuario.Nombres || AppState.usuario.usuario || 'estudiante';
+  const level = document.querySelector('.level-progress');
+  level.querySelector('.level-copy span').textContent = 'Avance general';
+  level.querySelector('.level-copy strong').textContent = `${data.avanceGeneral}%`;
+  level.querySelector('.progress-bar').style.width = `${data.avanceGeneral}%`;
+  level.querySelector('small').textContent = `${data.cursosCompletados} de ${data.cursosAsignados} cursos completados`;
+  const stats = document.querySelectorAll('.profile-stats strong');
+  stats[0].textContent = data.horasCapacitacion;
+  stats[1].textContent = data.cursosPendientes;
+  stats[2].textContent = data.certificadosObtenidos;
+  const statLabels = document.querySelectorAll('.profile-stats span');
+  statLabels[0].textContent = 'Horas completadas';
+  statLabels[1].textContent = 'Cursos pendientes';
+  statLabels[2].textContent = 'Certificados';
+  const achievement = document.querySelector('.achievement-card');
+  achievement.querySelector('h3').textContent = data.certificadosObtenidos ? 'Curso completado' : 'Tu proximo logro';
+  achievement.querySelector('p').textContent = data.certificadosObtenidos ? `Has logrado ${data.certificadosObtenidos} certificado(s).` : 'Completa un curso al 100 % para obtener tu primer certificado.';
+  achievement.querySelector('.achievement-streak strong').textContent = `${data.avanceGeneral}%`;
+  achievement.querySelector('.achievement-streak span').textContent = 'Avance general';
+  if (featured) {
+    document.getElementById('featuredCourseName').textContent = featured.nombre;
+    description.textContent = featured.descripcion_corta || featured.descripcion_completa || 'Continua avanzando en tu curso asignado.';
+    document.getElementById('featuredCourseMeta').innerHTML = `<span><i class="fa-regular fa-clock"></i> ${featured.duracion_estimada_min || 0} min</span><span><i class="fa-solid fa-layer-group"></i> ${featured.cantidad_modulos || 0} modulos</span><span><i class="fa-solid fa-chart-line"></i> ${featured.avance}%</span>`;
+    hero.querySelector('.hero-actions').innerHTML = `<button class="btn btn-gold btn-lg" type="button" onclick="openStudentCourse(${featured.id})"><i class="fa-solid fa-play me-2"></i>${featured.avance ? 'Continuar curso' : 'Comenzar curso'}</button>`;
+  } else {
+    document.getElementById('featuredCourseName').textContent = 'Aun no tienes cursos asignados';
+    description.textContent = 'Cuando el administrador te asigne un curso, aparecera aqui.';
+    document.getElementById('featuredCourseMeta').innerHTML = '<span><i class="fa-solid fa-circle-info"></i> Sin asignaciones</span>';
+    hero.querySelector('.hero-actions').innerHTML = '';
+  }
+
+  const courses = data.cursos || [];
+  document.getElementById('assignedCoursesGrid').innerHTML = courses.length ? courses.map((course) => `
+    <article class="visual-course-card course-theme-ai"><div class="course-image">${course.imagen_portada_url ? `<img class="student-course-cover" src="${escapeHtml(course.imagen_portada_url)}" alt="">` : '<div class="course-icon"><i class="fa-solid fa-graduation-cap"></i></div>'}<span class="course-status in-progress">${course.avance === 100 ? 'Completado' : 'Asignado'}</span></div><div class="course-card-body"><span class="course-category">${escapeHtml(course.categoria || 'CURSO')}</span><h3>${escapeHtml(course.nombre)}</h3><div class="course-meta"><span><i class="fa-regular fa-clock"></i> ${course.duracion_estimada_min || 0} min</span><span>${course.lecciones_completadas}/${course.total_lecciones} pasos</span></div><div class="course-progress-copy"><span>Progreso</span><strong>${course.avance}%</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:${course.avance}%"></div></div><button class="btn course-action" type="button" onclick="openStudentCourse(${course.id})">${course.avance ? 'Continuar aprendizaje' : 'Comenzar curso'}</button></div></article>
+  `).join('') : '<div class="empty-state">No tienes cursos asignados.</div>';
+}
+
+async function openStudentCourse(id) {
+  showView('cursos');
+  await openCourseEditor(id);
+}
+
+async function loadStudentEvaluations() {
+  const container = document.getElementById('evaluationsContent');
+  container.innerHTML = '<div class="skeleton"></div>';
+  try {
+    const items = await EstudianteService.evaluaciones();
+    container.className = items.length ? 'student-resource-list' : 'empty-state';
+    container.innerHTML = items.length ? items.map((item) => `<article><div><span class="eyebrow">${escapeHtml(item.curso.nombre)}</span><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.descripcion || 'Evaluacion asignada')}</p></div><button class="btn btn-gold" onclick="openStudentCourse(${item.curso.id})">Abrir evaluacion</button></article>`).join('') : '<i class="fa-solid fa-clipboard-check fa-2x mb-3"></i><div class="fw-semibold">No tienes evaluaciones asignadas</div>';
+  } catch (error) { container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`; }
+}
+
+async function loadStudentCertificates() {
+  const container = document.getElementById('certificatesContent');
+  container.innerHTML = '<div class="skeleton"></div>';
+  try {
+    const items = await EstudianteService.certificados();
+    container.className = items.length ? 'student-resource-list' : 'empty-state';
+    container.innerHTML = items.length ? items.map((item) => `<article><div class="certificate-icon"><i class="fa-solid fa-award"></i></div><div><span class="eyebrow">CERTIFICADO LOGRADO</span><h3>${escapeHtml(item.curso.nombre)}</h3><p>Codigo: ${escapeHtml(item.codigo)} · Emitido: ${formatDate(item.emitido_at)}</p></div></article>`).join('') : '<i class="fa-solid fa-award fa-2x mb-3"></i><div class="fw-semibold">Aun no tienes certificados</div><small>Completa un curso al 100 % para obtenerlo.</small>';
+  } catch (error) { container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`; }
 }
 
 function renderProgressChart(data) {
@@ -342,10 +449,11 @@ function openCreateUserModal() {
   document.getElementById('fieldEstado').value = 'Activo';
   document.getElementById('fieldTipoPlan').value = 'Gratuito';
   document.getElementById('fieldPassword').required = true;
+  renderAssignedCourseOptions([]);
   AppState.userModal.show();
 }
 
-function openEditUserModal(id) {
+async function openEditUserModal(id) {
   const user = AppState.usuarios.find((item) => item.id === id);
   if (!user) return;
 
@@ -364,7 +472,18 @@ function openEditUserModal(id) {
   document.getElementById('fieldTipoPlan').value = user.tipo_plan || 'Gratuito';
   document.getElementById('fieldPassword').value = '';
   document.getElementById('fieldPassword').required = false;
+  try {
+    renderAssignedCourseOptions(await UsuariosService.asignaciones(id));
+  } catch (error) {
+    renderAssignedCourseOptions([]);
+  }
   AppState.userModal.show();
+}
+
+function renderAssignedCourseOptions(selectedIds) {
+  const selected = new Set((selectedIds || []).map(Number));
+  const courses = AppState.cursos.filter((course) => course.estado === 'Publicado');
+  document.getElementById('fieldAssignedCourses').innerHTML = courses.map((course) => `<option value="${course.id}" ${selected.has(course.id) ? 'selected' : ''}>${escapeHtml(course.nombre)}</option>`).join('');
 }
 
 async function handleSaveUser(event) {
@@ -388,11 +507,9 @@ async function handleSaveUser(event) {
   if (password) payload.password = password;
 
   try {
-    if (id) {
-      await UsuariosService.actualizar(id, payload);
-    } else {
-      await UsuariosService.crear(payload);
-    }
+    const savedUser = id ? await UsuariosService.actualizar(id, payload) : await UsuariosService.crear(payload);
+    const courseIds = Array.from(document.getElementById('fieldAssignedCourses').selectedOptions).map((option) => Number(option.value));
+    await UsuariosService.guardarAsignaciones(savedUser.id, courseIds);
 
     AppState.userModal.hide();
     await loadUsers();
@@ -463,6 +580,7 @@ async function loadCourses() {
   tbody.innerHTML = '<tr><td colspan="6"><div class="skeleton"></div></td></tr>';
   try {
     AppState.cursos = await CursosService.listar();
+    if (!isStudent()) renderAssignedCourseOptions([]);
     renderCoursesTable();
   } catch (error) {
     tbody.innerHTML = `<tr><td colspan="6" class="text-warning">${escapeHtml(error.message)}</td></tr>`;
@@ -478,11 +596,14 @@ function renderCoursesTable() {
     return (!search || text.includes(search)) && (!status || curso.estado === status) && (!category || String(curso.categoria || '').toLowerCase().includes(category));
   });
   const tbody = document.getElementById('coursesTableBody');
+  const canManage = canManageCourses();
+  document.querySelector('#coursesListPanel .eyebrow').textContent = canManage ? 'ADMINISTRACION ACADEMICA' : 'MI APRENDIZAJE';
+  document.querySelector('#coursesListPanel h1').textContent = canManage ? 'Gestion de Cursos' : 'Mis cursos';
+  document.querySelector('#coursesListPanel p').textContent = canManage ? 'Disena experiencias, rutas y contenidos de aprendizaje potenciados por IA.' : 'Cursos asignados por tu administrador y avance de aprendizaje.';
   if (!courses.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-secondary">No hay cursos para mostrar.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="text-secondary">${canManage ? 'No hay cursos para mostrar.' : 'Aun no tienes cursos asignados.'}</td></tr>`;
     return;
   }
-  const canManage = canManageCourses();
   tbody.innerHTML = courses.map((curso) => `
     <tr>
       <td><div class="fw-semibold">${escapeHtml(curso.nombre)}</div><small class="text-secondary">${escapeHtml(curso.descripcion_corta || '')}</small></td>
