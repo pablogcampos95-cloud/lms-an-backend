@@ -308,6 +308,29 @@
 
   .modal-content { border: 1px solid var(--line); }
 
+  .admin-filter { max-width: 240px; }
+
+  .report-card {
+    width: 100%;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    color: var(--text);
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    transition: transform 160ms ease, border-color 160ms ease;
+  }
+
+  .report-card:hover { transform: translateY(-2px); border-color: var(--gold); }
+  .report-card i { color: var(--gold); font-size: 1.8rem; }
+  .report-card small { color: var(--muted); }
+
   @media (max-width: 900px) {
     .app-shell { display: block; }
     .sidebar {

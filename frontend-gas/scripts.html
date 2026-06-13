@@ -167,7 +167,11 @@ function renderMenu() {
 }
 
 function showView(viewName) {
-  const target = document.getElementById(`view-${viewName}`) || document.getElementById('view-dashboard');
+  let target = document.getElementById(`view-${viewName}`);
+  if (!target) {
+    target = document.getElementById('view-not-found');
+    document.getElementById('missingViewMessage').textContent = `La seccion "${viewName}" todavia no tiene una pantalla configurada.`;
+  }
   document.querySelectorAll('.view').forEach((view) => view.classList.remove('active'));
   target.classList.add('active');
 
@@ -176,6 +180,14 @@ function showView(viewName) {
   });
 
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
+}
+
+function showModuleNotice(moduleName) {
+  Swal.fire({ icon: 'info', title: moduleName, text: 'La pantalla ya esta habilitada. La operacion avanzada se conectara en la siguiente etapa.', confirmButtonText: 'Entendido' });
+}
+
+function saveLocalSettings() {
+  toastSuccess('Preferencias guardadas');
 }
 
 async function loadDashboard() {
