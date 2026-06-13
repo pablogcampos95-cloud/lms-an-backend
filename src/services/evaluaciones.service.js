@@ -1,6 +1,7 @@
 const supabase = require('./supabase.service');
 const AppError = require('../utils/AppError');
 const estudianteService = require('./estudiante.service');
+const courseSequence = require('./course-sequence.service');
 
 const fail = (error, message = 'Error al consultar Supabase') => {
   if (error) throw new AppError(message, 500, error.message);
@@ -89,6 +90,7 @@ const detail = async (user, id) => {
 
 const normalizeEvaluation = (payload) => ({
   curso_id: Number(payload.curso_id), modulo_id: payload.modulo_id ? Number(payload.modulo_id) : null, leccion_id: payload.leccion_id ? Number(payload.leccion_id) : null,
+  orden: payload.orden ? Number(payload.orden) : null,
   titulo: String(payload.titulo || '').trim(), descripcion: payload.descripcion || null, ubicacion: payload.ubicacion || 'FinModulo', estado: payload.estado || 'Borrador',
   fecha_inicio: payload.fecha_inicio || null, fecha_limite: payload.fecha_limite || null, tiempo_limite_min: payload.tiempo_limite_min ? Number(payload.tiempo_limite_min) : null,
   intentos_permitidos: Math.max(1, Number(payload.intentos_permitidos || 1)), puntaje_minimo: Number(payload.puntaje_minimo ?? 70),
@@ -119,6 +121,7 @@ const create = async (user, payload) => {
   if (!(payload.preguntas || []).length) throw new AppError('La evaluacion debe incluir al menos una pregunta', 400);
   if (clean.ubicacion === 'FinModulo' && !clean.modulo_id) throw new AppError('Selecciona el modulo donde se ubicara la evaluacion', 400);
   if (clean.ubicacion === 'DespuesPaso' && !clean.leccion_id) throw new AppError('Selecciona el paso despues del cual aparecera la evaluacion', 400);
+  if (clean.modulo_id && !clean.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
   const { data, error } = await supabase.from('evaluaciones').insert({ ...clean, creado_por: user.id }).select('*').single();
   fail(error);
   await replaceQuestions(data.id, payload.preguntas || []);
@@ -135,6 +138,7 @@ const update = async (user, id, payload) => {
     fail(attemptsError);
     if (count > 0) throw new AppError('No puedes modificar las preguntas porque la evaluacion ya tiene intentos registrados', 409);
   }
+  if (clean.modulo_id && Number(clean.modulo_id) !== Number(current.modulo_id) && !payload.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
   const { error } = await supabase.from('evaluaciones').update({ ...clean, updated_at: new Date().toISOString() }).eq('id', id);
   fail(error);
   if (payload.preguntas) await replaceQuestions(id, payload.preguntas);
@@ -142,7 +146,8 @@ const update = async (user, id, payload) => {
 };
 
 const remove = async (user, id) => { const current = await getEvaluation(id); await assertCourseAccess(user, current.curso_id); fail((await supabase.from('evaluaciones').delete().eq('id', id)).error); return current; };
-const duplicate = async (user, id) => { const source = await detail(user, id); const { preguntas, curso, modulo, leccion, creador, ...payload } = source; return create(user, { ...payload, titulo: `${source.titulo} (copia)`, estado: 'Borrador', preguntas }); };
+const reorder = async (user, id, direction) => { const current = await getEvaluation(id); await assertCourseAccess(user, current.curso_id); return courseSequence.reorder('Evaluacion', id, direction); };
+const duplicate = async (user, id) => { const source = await detail(user, id); const { preguntas, curso, modulo, leccion, creador, ...payload } = source; return create(user, { ...payload, orden: null, titulo: `${source.titulo} (copia)`, estado: 'Borrador', preguntas }); };
 
 const startAttempt = async (user, evaluationId) => {
   if (roleName(user) !== 'Estudiante') throw new AppError('Solo estudiantes pueden responder evaluaciones', 403);
@@ -234,7 +239,7 @@ const forumResults = async (user, forumId) => { const forum = await getForum(for
 const gradeForum = async (user, responseId, payload) => { const { data: response, error } = await supabase.from('foro_respuestas').select('*, foro:foros_evaluables(curso_id)').eq('id', responseId).maybeSingle(); fail(error); if (!response) throw new AppError('Respuesta no encontrada', 404); await assertCourseAccess(user, response.foro.curso_id); const stars = Number(payload.estrellas); if (stars < 1 || stars > 5) throw new AppError('La calificacion debe estar entre 1 y 5 estrellas', 400); const { data, error: updateError } = await supabase.from('foro_respuestas').update({ estrellas: stars, retroalimentacion: payload.retroalimentacion || null, estado: 'Calificado', calificado_por: user.id, calificado_at: new Date().toISOString() }).eq('id', responseId).select('*').single(); fail(updateError); return data; };
 
 const activitySatisfied = (activity, record) => { if (!record) return false; if (activity.tipo_actividad === 'Evaluacion') { if (activity.condicion_desbloqueo === 'Responder') return record.estado !== 'EnProgreso'; if (activity.condicion_desbloqueo === 'CalificacionManual') return !['EnProgreso','Enviado','PendienteCalificacion'].includes(record.estado); return record.estado === 'Aprobado'; } if (activity.condicion_desbloqueo === 'Responder') return true; if (activity.condicion_desbloqueo === 'Calificacion') return record.estado === 'Calificado'; return Number(record.estrellas || 0) >= Number(activity.minimo_estrellas || 1); };
-const courseActivities = async (courseId, userId) => { const { data: evaluations, error } = await supabase.from('evaluaciones').select('*').eq('curso_id', courseId).eq('estado', 'Publicada'); if (missingEvaluationSchema(error)) return []; fail(error); const { data: forums, error: forumError } = await supabase.from('foros_evaluables').select('*').eq('curso_id', courseId).eq('estado', 'Publicado'); if (missingEvaluationSchema(forumError)) return []; fail(forumError); let attempts = []; let responses = []; if (userId && evaluations.length) { const result = await supabase.from('evaluacion_intentos').select('*').eq('usuario_id', userId).in('evaluacion_id', evaluations.map((item) => item.id)).order('numero_intento', { ascending: false }); fail(result.error); attempts = result.data; } if (userId && forums.length) { const result = await supabase.from('foro_respuestas').select('*').eq('usuario_id', userId).in('foro_id', forums.map((item) => item.id)); fail(result.error); responses = result.data; } return [...evaluations.map((item) => { const record = attempts.find((attempt) => Number(attempt.evaluacion_id) === Number(item.id)); const activity = { ...item, tipo_actividad: 'Evaluacion', intento: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; }), ...forums.map((item) => { const record = responses.find((response) => Number(response.foro_id) === Number(item.id)); const activity = { ...item, tipo_actividad: 'Foro', respuesta: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; })]; };
+const courseActivities = async (courseId, userId, { publishedOnly = true } = {}) => { let evaluationsQuery = supabase.from('evaluaciones').select('*, preguntas:evaluacion_preguntas(count)').eq('curso_id', courseId); if (publishedOnly) evaluationsQuery = evaluationsQuery.eq('estado', 'Publicada'); const { data: evaluations, error } = await evaluationsQuery; if (missingEvaluationSchema(error)) return []; fail(error); let forumsQuery = supabase.from('foros_evaluables').select('*').eq('curso_id', courseId); if (publishedOnly) forumsQuery = forumsQuery.eq('estado', 'Publicado'); const { data: forums, error: forumError } = await forumsQuery; if (missingEvaluationSchema(forumError)) return []; fail(forumError); let attempts = []; let responses = []; if (userId && evaluations.length) { const result = await supabase.from('evaluacion_intentos').select('*').eq('usuario_id', userId).in('evaluacion_id', evaluations.map((item) => item.id)).order('numero_intento', { ascending: false }); fail(result.error); attempts = result.data; } if (userId && forums.length) { const result = await supabase.from('foro_respuestas').select('*').eq('usuario_id', userId).in('foro_id', forums.map((item) => item.id)); fail(result.error); responses = result.data; } return [...evaluations.map((item) => { const record = attempts.find((attempt) => Number(attempt.evaluacion_id) === Number(item.id)); const activity = { ...item, cantidad_preguntas: item.preguntas && item.preguntas[0] ? item.preguntas[0].count : 0, tipo_actividad: 'Evaluacion', intento: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; }), ...forums.map((item) => { const record = responses.find((response) => Number(response.foro_id) === Number(item.id)); const activity = { ...item, tipo_actividad: 'Foro', respuesta: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; })]; };
 
 const assertLessonUnlocked = async (userId, lessonId) => {
   const { data: lesson, error } = await supabase.from('lecciones').select('id,orden,modulo_id,modulo:modulos(id,orden,curso_id)').eq('id', lessonId).maybeSingle();
@@ -244,11 +249,15 @@ const assertLessonUnlocked = async (userId, lessonId) => {
   const activities = await courseActivities(lesson.modulo.curso_id, userId);
   const journey = [];
   modules.forEach((module) => {
-    lessons.filter((item) => Number(item.modulo_id) === Number(module.id)).forEach((item) => {
-      journey.push({ tipo: 'Leccion', id: item.id });
-      activities.filter((activity) => activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(item.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
+    const items = [
+      ...lessons.filter((item) => Number(item.modulo_id) === Number(module.id)).map((item) => ({ tipo: 'Leccion', id: item.id, orden: item.orden })),
+      ...activities.filter((activity) => activity.tipo_actividad === 'Evaluacion' && Number(activity.modulo_id) === Number(module.id)).map((activity) => ({ tipo: 'Actividad', activity, orden: activity.orden })),
+    ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
+    items.forEach((item) => {
+      journey.push(item);
+      if (item.tipo === 'Leccion') activities.filter((activity) => activity.tipo_actividad !== 'Evaluacion' && activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(item.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
     });
-    activities.filter((activity) => activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
+    activities.filter((activity) => activity.tipo_actividad !== 'Evaluacion' && activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
   });
   activities.filter((activity) => activity.ubicacion === 'FinCurso').forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
   const lessonIndex = journey.findIndex((item) => item.tipo === 'Leccion' && Number(item.id) === Number(lessonId));
@@ -257,4 +266,4 @@ const assertLessonUnlocked = async (userId, lessonId) => {
   return true;
 };
 
-module.exports = { list, listStudent, detail, create, update, remove, duplicate, startAttempt, submitAttempt, results, gradeAnswer, listForums, getForum, forumDetail, saveForum, removeForum, respondForum, forumResults, gradeForum, courseActivities, assertLessonUnlocked };
+module.exports = { list, listStudent, detail, create, update, remove, reorder, duplicate, startAttempt, submitAttempt, results, gradeAnswer, listForums, getForum, forumDetail, saveForum, removeForum, respondForum, forumResults, gradeForum, courseActivities, assertLessonUnlocked };

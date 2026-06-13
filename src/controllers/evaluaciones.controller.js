@@ -10,6 +10,7 @@ module.exports = {
   crear: async (req, res) => res.status(201).json({ ok: true, data: await service.create(req.user, req.body) }),
   actualizar: async (req, res) => ok(res, await service.update(req.user, req.params.id, req.body), 'Evaluacion actualizada'),
   eliminar: async (req, res) => ok(res, await service.remove(req.user, req.params.id), 'Evaluacion eliminada'),
+  ordenar: async (req, res) => ok(res, await service.reorder(req.user, req.params.id, req.body.direction), 'Orden actualizado'),
   duplicar: async (req, res) => res.status(201).json({ ok: true, data: await service.duplicate(req.user, req.params.id) }),
   iniciarIntento: async (req, res) => res.status(201).json({ ok: true, data: await service.startAttempt(req.user, req.params.id) }),
   enviarIntento: async (req, res) => ok(res, await service.submitAttempt(req.user, req.params.id, req.params.intentoId, req.body.respuestas), 'Evaluacion enviada'),

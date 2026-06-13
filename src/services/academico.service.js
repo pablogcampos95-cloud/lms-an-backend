@@ -1,4 +1,5 @@
 const sanitizeHtml = require('sanitize-html');
+const courseSequence = require('./course-sequence.service');
 
 const supabase = require('./supabase.service');
 const AppError = require('../utils/AppError');
@@ -109,23 +110,26 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
   }
   const progresoMap = new Map(progreso.map((item) => [item.leccion_id, item]));
 
-  let actividades = [];
-  if (publicado) {
-    const evaluacionesService = require('./evaluaciones.service');
-    actividades = await evaluacionesService.courseActivities(Number(id), usuarioId);
-  }
+  const evaluacionesService = require('./evaluaciones.service');
+  const actividades = await evaluacionesService.courseActivities(Number(id), usuarioId, { publishedOnly: publicado });
 
   const lockedLessonIds = new Set();
   if (publicado && usuarioId && actividades.length) {
     let locked = false;
     modulos.forEach((modulo) => {
-      lecciones.filter((leccion) => leccion.modulo_id === modulo.id).forEach((leccion) => {
-        if (locked) lockedLessonIds.add(leccion.id);
-        actividades.filter((actividad) => actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(leccion.id)).forEach((actividad) => {
-          if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
-        });
+      const moduleItems = [
+        ...lecciones.filter((leccion) => Number(leccion.modulo_id) === Number(modulo.id)).map((leccion) => ({ ...leccion, tipo_secuencia: 'Leccion' })),
+        ...actividades.filter((actividad) => actividad.tipo_actividad === 'Evaluacion' && Number(actividad.modulo_id) === Number(modulo.id)).map((actividad) => ({ ...actividad, tipo_secuencia: 'Actividad' })),
+      ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
+      moduleItems.forEach((item) => {
+        if (item.tipo_secuencia === 'Leccion') {
+          if (locked) lockedLessonIds.add(item.id);
+          actividades.filter((actividad) => actividad.tipo_actividad !== 'Evaluacion' && actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(item.id)).forEach((actividad) => {
+            if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
+          });
+        } else if (item.obligatoria && item.bloquea_avance && !item.completada) locked = true;
       });
-      actividades.filter((actividad) => actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
+      actividades.filter((actividad) => actividad.tipo_actividad !== 'Evaluacion' && actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
         if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
       });
     });
@@ -242,7 +246,7 @@ const prepareLeccionPayload = (payload) => {
 const createLeccion = async (payload) => {
   const clean = prepareLeccionPayload(payload);
   if (!clean.modulo_id || !clean.titulo) throw new AppError('Modulo y titulo de la leccion son obligatorios', 400);
-  clean.orden = clean.orden || await nextOrder('lecciones', 'modulo_id', clean.modulo_id);
+  clean.orden = clean.orden || await courseSequence.nextOrder(clean.modulo_id);
   const { data, error } = await supabase.from('lecciones').insert(clean).select('*, recursos(*)').single();
   throwSupabaseError(error);
   return data;
@@ -263,7 +267,7 @@ const deleteLeccion = async (id) => {
   return data;
 };
 
-const reorderLeccion = async (id, direction) => reorderItem('lecciones', id, 'modulo_id', direction);
+const reorderLeccion = async (id, direction) => courseSequence.reorder('Leccion', id, direction);
 
 const reorderItem = async (table, id, parentKey, direction) => {
   if (!['up', 'down'].includes(direction)) throw new AppError('Direccion de orden invalida', 400);

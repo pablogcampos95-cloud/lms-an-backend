@@ -23,6 +23,7 @@ router.get('/', asyncHandler(controller.listar));
 router.post('/', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.crear));
 router.get('/:id', asyncHandler(controller.obtener));
 router.put('/:id', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.actualizar));
+router.patch('/:id/orden', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.ordenar));
 router.delete('/:id', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.eliminar));
 router.post('/:id/duplicar', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.duplicar));
 router.post('/:id/intentos', authorizeRoles('Estudiante'), asyncHandler(controller.iniciarIntento));
