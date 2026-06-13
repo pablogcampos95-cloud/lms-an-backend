@@ -36,6 +36,7 @@
       </div>
       <div class="d-flex flex-wrap gap-2">
         <button id="previewCourse" class="btn btn-outline-light" type="button"><i class="fa-solid fa-eye me-2"></i>Vista previa</button>
+        <button id="assignCourseStudents" class="btn btn-outline-info" type="button"><i class="fa-solid fa-user-plus me-2"></i>Asignar estudiantes</button>
         <button id="editCurrentCourse" class="btn btn-outline-warning" type="button"><i class="fa-solid fa-pen me-2"></i>Editar datos</button>
         <button id="publishCurrentCourse" class="btn btn-gold" type="button"><i class="fa-solid fa-globe me-2"></i>Publicar curso</button>
       </div>
@@ -85,5 +86,11 @@
     </div></div><div class="modal-footer border-secondary"><button class="btn btn-outline-light" data-bs-dismiss="modal" type="button">Cancelar</button><button class="btn btn-gold" type="submit">Guardar paso</button></div>
   </form></div></div></div>
 
-  <div class="modal fade" id="coursePreviewModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content bg-dark text-light"><div class="modal-header border-secondary"><h2 class="modal-title h5">Vista previa del estudiante</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div id="coursePreviewBody" class="modal-body"></div></div></div></div>
+  <div class="modal fade" id="coursePreviewModal" tabindex="-1"><div class="modal-dialog modal-fullscreen-xl-down course-player-dialog"><div class="modal-content bg-dark text-light"><div class="modal-header border-secondary"><h2 class="modal-title h5">Experiencia del curso</h2><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div id="coursePreviewBody" class="modal-body course-player-modal-body"></div></div></div></div>
+
+  <div class="modal fade" id="courseAssignmentModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content bg-dark text-light">
+    <div class="modal-header border-secondary"><div><h2 class="modal-title h5">Asignar curso a estudiantes</h2><small id="assignmentCourseName" class="text-secondary"></small></div><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><label class="form-label">Estudiantes disponibles</label><div id="courseStudentsList" class="course-students-list"></div><small class="text-secondary">Solo aparecen usuarios activos o inactivos cuyo rol es Estudiante.</small></div>
+    <div class="modal-footer border-secondary"><button class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button><button id="saveCourseAssignments" class="btn btn-gold" type="button">Guardar asignaciones</button></div>
+  </div></div></div>
 </section>

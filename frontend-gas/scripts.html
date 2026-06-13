@@ -11,9 +11,11 @@ const AppState = {
   moduleModal: null,
   lessonModal: null,
   coursePreviewModal: null,
+  courseAssignmentModal: null,
   studentLessons: [],
   studentLessonIndex: 0,
   dashboardData: null,
+  previewMode: false,
 };
 
 const MENUS = {
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.moduleModal = new bootstrap.Modal(document.getElementById('moduleModal'));
   AppState.lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
   AppState.coursePreviewModal = new bootstrap.Modal(document.getElementById('coursePreviewModal'));
+  AppState.courseAssignmentModal = new bootstrap.Modal(document.getElementById('courseAssignmentModal'));
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('logoutButton').addEventListener('click', handleLogout);
@@ -82,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('editCurrentCourse').addEventListener('click', () => openEditCourseModal(AppState.cursoActual.id));
   document.getElementById('publishCurrentCourse').addEventListener('click', publishCurrentCourse);
   document.getElementById('previewCourse').addEventListener('click', previewCurrentCourse);
+  document.getElementById('assignCourseStudents').addEventListener('click', openCourseAssignmentModal);
+  document.getElementById('saveCourseAssignments').addEventListener('click', saveCourseAssignments);
 
   boot();
 });
@@ -708,6 +713,7 @@ async function openCourseEditor(id) {
     document.getElementById('editCurrentCourse').classList.toggle('d-none', !canManageCourses());
     document.getElementById('publishCurrentCourse').classList.toggle('d-none', !canManageCourses());
     document.getElementById('previewCourse').classList.toggle('d-none', !canManageCourses());
+    document.getElementById('assignCourseStudents').classList.toggle('d-none', !(AppState.usuario && AppState.usuario.rol && AppState.usuario.rol.nombre === 'Administrador'));
     document.getElementById('courseInfoSummary').innerHTML = `
       <div class="row g-4 align-items-center">
         ${AppState.cursoActual.imagen_portada_url ? `<div class="col-md-3"><img class="course-cover" src="${escapeHtml(AppState.cursoActual.imagen_portada_url)}" alt="Portada"></div>` : ''}
@@ -729,7 +735,7 @@ function renderModulesEditor() {
   const modulos = AppState.cursoActual.modulos || [];
   if (!modulos.length) { container.innerHTML = '<div class="empty-state">Este curso todavia no tiene modulos.</div>'; return; }
   if (!canManageCourses()) {
-    AppState.studentLessons = modulos.flatMap((modulo) => modulo.lecciones);
+    AppState.studentLessons = modulos.flatMap((modulo) => modulo.lecciones.map((leccion) => ({ ...leccion, modulo_nombre: modulo.nombre })));
     container.innerHTML = modulos.map((modulo, index) => `
       <article class="module-editor-card mb-3"><div class="module-editor-header"><div><div class="text-secondary small">Modulo ${index + 1}</div><h3 class="h5 mb-1">${escapeHtml(modulo.nombre)}</h3><small class="text-secondary">${modulo.lecciones.length} pasos · ${modulo.duracion_estimada_min || 0} min</small></div></div>
       <div class="lesson-list">${modulo.lecciones.map((leccion) => { const lessonIndex = AppState.studentLessons.findIndex((item) => item.id === leccion.id); return `<button class="student-lesson-link" type="button" onclick="openStudentLesson(${lessonIndex})"><span class="lesson-order">${lessonIndex + 1}</span><span class="flex-grow-1 text-start"><strong>${escapeHtml(leccion.titulo)}</strong><small>${escapeHtml(leccion.tipo_contenido)} · ${leccion.tiempo_estimado_min || 0} min</small></span>${leccion.progreso && leccion.progreso.completado ? '<i class="fa-solid fa-circle-check text-success"></i>' : '<i class="fa-solid fa-chevron-right"></i>'}</button>`; }).join('')}</div></article>`).join('');
@@ -815,8 +821,33 @@ async function deleteCourse(id) { if (!(await confirmAction('Eliminar curso', 'S
 
 function previewCurrentCourse() {
   const curso = AppState.cursoActual; if (!curso) return;
-  document.getElementById('coursePreviewBody').innerHTML = `<div class="student-course-preview"><div class="mb-4">${curso.imagen_portada_url ? `<img class="preview-cover" src="${escapeHtml(curso.imagen_portada_url)}" alt="Portada">` : ''}<h2>${escapeHtml(curso.nombre)}</h2><p class="text-secondary">${escapeHtml(curso.descripcion_completa || curso.descripcion_corta || '')}</p></div>${curso.modulos.map((modulo, index) => `<section class="preview-module"><h3 class="h5">${index + 1}. ${escapeHtml(modulo.nombre)}</h3>${modulo.lecciones.map((leccion) => `<article class="preview-lesson"><h4 class="h6">${escapeHtml(leccion.titulo)}</h4>${renderLessonPreview(leccion)}</article>`).join('')}</section>`).join('')}</div>`;
+  AppState.previewMode = true;
+  AppState.studentLessons = (curso.modulos || []).flatMap((modulo) => (modulo.lecciones || []).map((leccion) => ({ ...leccion, modulo_nombre: modulo.nombre })));
+  AppState.studentLessonIndex = 0;
+  renderStudentCoursePlayer();
   AppState.coursePreviewModal.show();
+}
+
+async function openCourseAssignmentModal() {
+  if (!AppState.cursoActual) return;
+  document.getElementById('assignmentCourseName').textContent = AppState.cursoActual.nombre;
+  const container = document.getElementById('courseStudentsList');
+  container.innerHTML = '<div class="skeleton"></div>';
+  AppState.courseAssignmentModal.show();
+  try {
+    const students = await CursosService.estudiantesAsignados(AppState.cursoActual.id);
+    container.innerHTML = students.length ? students.map((student) => `<label class="course-student-option"><input class="form-check-input course-student-check" type="checkbox" value="${student.id}" ${student.asignado ? 'checked' : ''}><span class="course-student-avatar"><i class="fa-solid fa-user-graduate"></i></span><span><strong>${escapeHtml(student.Nombres || student.usuario)}</strong><small>${escapeHtml(student.Correo || student.usuario || '')} · ${escapeHtml(student.Estado || '')}</small></span></label>`).join('') : '<div class="empty-state">No existen usuarios con rol Estudiante.</div>';
+  } catch (error) { container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`; }
+}
+
+async function saveCourseAssignments() {
+  if (!AppState.cursoActual) return;
+  const ids = Array.from(document.querySelectorAll('.course-student-check:checked')).map((input) => Number(input.value));
+  try {
+    await CursosService.asignarEstudiantes(AppState.cursoActual.id, ids);
+    AppState.courseAssignmentModal.hide();
+    toastSuccess('Estudiantes asignados');
+  } catch (error) { Swal.fire('No se pudo asignar el curso', error.message, 'error'); }
 }
 
 function renderLessonPreview(leccion) {
@@ -837,21 +868,45 @@ function canManageCourses() {
 
 function openStudentLesson(index) {
   AppState.studentLessonIndex = index;
-  renderStudentLesson();
+  AppState.previewMode = false;
+  renderStudentCoursePlayer();
   AppState.coursePreviewModal.show();
 }
 
-function renderStudentLesson() {
+function renderStudentCoursePlayer() {
   const leccion = AppState.studentLessons[AppState.studentLessonIndex];
-  if (!leccion) return;
+  const curso = AppState.cursoActual;
+  if (!leccion) {
+    document.getElementById('coursePreviewBody').innerHTML = '<div class="empty-state">Este curso todavia no tiene pasos disponibles.</div>';
+    return;
+  }
+  const cover = curso.imagen_portada_url ? `style="background-image:linear-gradient(90deg,rgba(2,13,31,.94),rgba(2,20,42,.55)),url('${escapeHtml(curso.imagen_portada_url)}')"` : '';
   document.getElementById('coursePreviewBody').innerHTML = `
-    <div class="student-lesson-view">
-      <div class="d-flex justify-content-between align-items-start gap-3 mb-4"><div><div class="text-secondary">Paso ${AppState.studentLessonIndex + 1} de ${AppState.studentLessons.length}</div><h2>${escapeHtml(leccion.titulo)}</h2><p class="text-secondary">${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div>
-      <div class="lesson-content mb-4">${renderLessonPreview(leccion)}</div>
-      <div class="d-flex flex-wrap justify-content-between gap-2"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button><button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>Marcar como completado</button><button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+    <div class="student-course-player">
+      <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
+      <div class="student-player-layout">
+        <aside class="student-player-sidebar"><div class="student-player-sidebar-title">Contenido del curso</div>${renderStudentCourseOutline()}</aside>
+        <main class="student-player-content">
+          <div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div>
+          <div class="lesson-content">${renderLessonPreview(leccion)}</div>
+          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+        </main>
+      </div>
     </div>`;
 }
 
-function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentLesson(); }
-async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentLesson(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
+function renderStudentCourseOutline() {
+  let lastModule = '';
+  return AppState.studentLessons.map((lesson, index) => {
+    const moduleTitle = lesson.modulo_nombre || 'Modulo';
+    const heading = moduleTitle !== lastModule ? `<div class="student-outline-module">${escapeHtml(moduleTitle)}</div>` : '';
+    lastModule = moduleTitle;
+    return `${heading}<button class="student-outline-step ${index === AppState.studentLessonIndex ? 'active' : ''}" type="button" onclick="selectStudentLesson(${index})"><span>${index + 1}</span><div><strong>${escapeHtml(lesson.titulo)}</strong><small>${escapeHtml(lesson.tipo_contenido)} · ${lesson.tiempo_estimado_min || 0} min</small></div>${lesson.progreso && lesson.progreso.completado ? '<i class="fa-solid fa-circle-check"></i>' : ''}</button>`;
+  }).join('');
+}
+
+function selectStudentLesson(index) { AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
+
+function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentCoursePlayer(); }
+async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
 </script>

@@ -11,6 +11,8 @@ const CursosService = {
   async actualizar(id, payload) { return (await ApiService.request(`/api/cursos/${id}`, { method: 'PUT', body: JSON.stringify(payload) })).data; },
   async eliminar(id) { return (await ApiService.request(`/api/cursos/${id}`, { method: 'DELETE' })).data; },
   async duplicar(id) { return (await ApiService.request(`/api/cursos/${id}/duplicar`, { method: 'POST' })).data; },
+  async estudiantesAsignados(id) { return (await ApiService.request(`/api/cursos/${id}/asignaciones`)).data || []; },
+  async asignarEstudiantes(id, usuarioIds) { return (await ApiService.request(`/api/cursos/${id}/asignaciones`, { method: 'PUT', body: JSON.stringify({ usuario_ids: usuarioIds }) })).data; },
   async listarModulos(cursoId) { return (await ApiService.request(`/api/modulos?curso_id=${cursoId}`)).data; },
   async crearModulo(payload) { return (await ApiService.request('/api/modulos', { method: 'POST', body: JSON.stringify(payload) })).data; },
   async actualizarModulo(id, payload) { return (await ApiService.request(`/api/modulos/${id}`, { method: 'PUT', body: JSON.stringify(payload) })).data; },

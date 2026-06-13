@@ -129,6 +129,36 @@ const setAssignments = async (usuarioId, courseIds, assignedBy) => {
   return ids;
 };
 
+const getCourseStudents = async (cursoId) => {
+  const { data: role, error: roleError } = await supabase.from('roles').select('id').eq('nombre', 'Estudiante').maybeSingle();
+  throwSupabaseError(roleError);
+  if (!role) return [];
+  const { data: users, error: usersError } = await supabase.from('usuarios').select('id,"Nombres",usuario,"Correo","Estado"').eq('rol_id', role.id).order('Nombres');
+  throwSupabaseError(usersError);
+  const { data: assignments, error } = await supabase.from('curso_asignaciones').select('usuario_id').eq('curso_id', cursoId).neq('estado', 'Cancelado');
+  throwSupabaseError(error);
+  const selected = new Set(assignments.map((item) => Number(item.usuario_id)));
+  return users.map((user) => ({ ...user, asignado: selected.has(Number(user.id)) }));
+};
+
+const setCourseStudents = async (cursoId, usuarioIds, assignedBy) => {
+  const ids = [...new Set((usuarioIds || []).map(Number).filter(Number.isInteger))];
+  const { data: role, error: roleError } = await supabase.from('roles').select('id').eq('nombre', 'Estudiante').maybeSingle();
+  throwSupabaseError(roleError);
+  if (ids.length) {
+    const { data: validUsers, error: usersError } = await supabase.from('usuarios').select('id').eq('rol_id', role.id).in('id', ids);
+    throwSupabaseError(usersError);
+    if (validUsers.length !== ids.length) throw new AppError('Solo se puede asignar el curso a usuarios con rol Estudiante', 400);
+  }
+  const { error: deleteError } = await supabase.from('curso_asignaciones').delete().eq('curso_id', cursoId);
+  throwSupabaseError(deleteError);
+  if (ids.length) {
+    const { error } = await supabase.from('curso_asignaciones').insert(ids.map((usuarioId) => ({ usuario_id: usuarioId, curso_id: Number(cursoId), asignado_por: assignedBy })));
+    throwSupabaseError(error);
+  }
+  return ids;
+};
+
 const isLessonAssigned = async (usuarioId, lessonId) => {
   const courseIds = await getAssignedCourseIds(usuarioId);
   if (!courseIds.length) return false;
@@ -137,4 +167,4 @@ const isLessonAssigned = async (usuarioId, lessonId) => {
   return Boolean(data && data.modulo && courseIds.includes(Number(data.modulo.curso_id)));
 };
 
-module.exports = { getAssignedCourseIds, getDashboard, getEvaluations, getCertificates, getAssignments, setAssignments, isLessonAssigned };
+module.exports = { getAssignedCourseIds, getDashboard, getEvaluations, getCertificates, getAssignments, setAssignments, getCourseStudents, setCourseStudents, isLessonAssigned };

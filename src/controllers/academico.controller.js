@@ -28,6 +28,8 @@ const crearCurso = async (req, res) => res.status(201).json({ ok: true, data: aw
 const actualizarCurso = async (req, res) => ok(res, await academicoService.updateCurso(req.params.id, req.body), 'Curso actualizado');
 const eliminarCurso = async (req, res) => ok(res, await academicoService.deleteCurso(req.params.id), 'Curso eliminado');
 const duplicarCurso = async (req, res) => res.status(201).json({ ok: true, data: await academicoService.duplicateCurso(req.params.id, req.user.id) });
+const obtenerEstudiantesCurso = async (req, res) => ok(res, await estudianteService.getCourseStudents(req.params.id));
+const asignarEstudiantesCurso = async (req, res) => ok(res, await estudianteService.setCourseStudents(req.params.id, req.body.usuario_ids, req.user.id), 'Estudiantes asignados');
 
 const listarModulos = async (req, res) => ok(res, await academicoService.listModulos(req.query.curso_id));
 const crearModulo = async (req, res) => res.status(201).json({ ok: true, data: await academicoService.createModulo(req.body) });
@@ -79,7 +81,7 @@ const completarLeccion = async (req, res) => {
 };
 
 module.exports = {
-  listarCursos, obtenerCurso, obtenerCursoPublicado, crearCurso, actualizarCurso, eliminarCurso, duplicarCurso,
+  listarCursos, obtenerCurso, obtenerCursoPublicado, crearCurso, actualizarCurso, eliminarCurso, duplicarCurso, obtenerEstudiantesCurso, asignarEstudiantesCurso,
   listarModulos, crearModulo, actualizarModulo, eliminarModulo, ordenarModulo,
   listarLecciones, crearLeccion, actualizarLeccion, eliminarLeccion, ordenarLeccion,
   subirArchivo, completarLeccion,

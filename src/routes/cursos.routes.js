@@ -8,6 +8,8 @@ const router = Router();
 
 router.use(requireAuth);
 router.get('/', asyncHandler(controller.listarCursos));
+router.get('/:id/asignaciones', authorizeRoles('Administrador'), asyncHandler(controller.obtenerEstudiantesCurso));
+router.put('/:id/asignaciones', authorizeRoles('Administrador'), asyncHandler(controller.asignarEstudiantesCurso));
 router.get('/:id/aprender', asyncHandler(controller.obtenerCursoPublicado));
 router.get('/:id', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.obtenerCurso));
 router.post('/', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.crearCurso));
