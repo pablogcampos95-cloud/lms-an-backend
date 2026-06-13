@@ -12,9 +12,11 @@ const ALLOWED_FIELDS = [
   'usuario',
   'password',
   'rol_id',
+  'tipo_plan',
 ];
 
-const REQUIRED_FIELDS = ['DNI', 'Nombres', 'Correo', 'Cargo', 'Estado', 'usuario', 'password', 'rol_id'];
+const REQUIRED_FIELDS = ['DNI', 'Nombres', 'Correo', 'Cargo', 'Estado', 'usuario', 'password', 'rol_id', 'tipo_plan'];
+const ALLOWED_PLAN_TYPES = ['Gratuito', 'Pagado'];
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -69,6 +71,10 @@ const validateCreateUsuario = (req, res, next) => {
     errors.push('El campo rol_id debe ser un numero entero positivo');
   }
 
+  if (usuario.tipo_plan && !ALLOWED_PLAN_TYPES.includes(usuario.tipo_plan)) {
+    errors.push('El campo tipo_plan debe ser Gratuito o Pagado');
+  }
+
   if (errors.length > 0) {
     return next(new AppError('Datos de usuario invalidos', 400, errors));
   }
@@ -100,6 +106,10 @@ const validateUpdateUsuario = (req, res, next) => {
 
   if (usuario.rol_id !== undefined && (!Number.isInteger(Number(usuario.rol_id)) || Number(usuario.rol_id) <= 0)) {
     errors.push('El campo rol_id debe ser un numero entero positivo');
+  }
+
+  if (usuario.tipo_plan !== undefined && !ALLOWED_PLAN_TYPES.includes(usuario.tipo_plan)) {
+    errors.push('El campo tipo_plan debe ser Gratuito o Pagado');
   }
 
   if (errors.length > 0) {

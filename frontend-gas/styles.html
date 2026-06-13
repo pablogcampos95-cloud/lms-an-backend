@@ -511,6 +511,13 @@
   .period-filter button.active { color: var(--text); background: #1a2542; }
 
   .learning-plan-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; }
+  .current-plan-card { display: flex; align-items: center; gap: 28px; padding: 34px; border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(135deg, rgba(7,25,51,.98), rgba(4,47,65,.92)); box-shadow: var(--shadow); }
+  .current-plan-card.plan-card-paid { border-color: rgba(35,224,199,.55); background: linear-gradient(135deg, rgba(7,25,51,.98), rgba(11,76,116,.94)); }
+  .current-plan-icon { display: grid; place-items: center; flex: 0 0 96px; width: 96px; height: 96px; border-radius: 28px; color: var(--cyan); font-size: 2.3rem; background: linear-gradient(145deg, rgba(35,224,199,.18), rgba(35,139,255,.22)); border: 1px solid rgba(35,224,199,.35); }
+  .current-plan-copy h2 { margin: 6px 0 8px; font-size: 2rem; }.current-plan-copy p { max-width: 720px; margin-bottom: 18px; color: var(--muted); }
+  .current-plan-owner { display: inline-flex; align-items: center; gap: 9px; color: var(--text); }.current-plan-owner i { color: var(--cyan); }
+  .plan-feature-card { height: 100%; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }.plan-feature-card i { color: var(--cyan); font-size: 1.4rem; }.plan-feature-card h3 { margin: 16px 0 8px; font-size: 1rem; }.plan-feature-card p { margin: 0; color: var(--muted); font-size: .88rem; }
+  .plan-badge-paid { color: #02151d; background: linear-gradient(135deg, var(--cyan), #2a91ff); }
   .profile-progress-card, .achievement-card { padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); box-shadow: var(--shadow); }
   .profile-progress-header { display: flex; align-items: center; gap: 18px; }
   .profile-progress-header h2 { margin: 2px 0; font-size: 1.65rem; }.profile-progress-header p { margin: 0; color: var(--muted); }
@@ -563,6 +570,7 @@
     .learning-hero-content { padding: 38px; }
     .hero-visual { min-height: 280px; }
     .learning-plan-grid, .course-showcase-grid, .recommendation-strip { grid-template-columns: 1fr; }
+    .current-plan-card { align-items: flex-start; flex-direction: column; padding: 24px; }
     .learning-path-card { grid-template-columns: auto 1fr; }
     .path-progress { grid-column: 1 / -1; text-align: left; }
     .path-progress .btn { width: 100%; }

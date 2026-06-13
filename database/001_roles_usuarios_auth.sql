@@ -30,12 +30,14 @@ create table if not exists public.usuarios (
   created_at timestamptz not null default now(),
   usuario text,
   password_hash text,
+  tipo_plan text not null default 'Gratuito' check (tipo_plan in ('Gratuito', 'Pagado')),
   rol_id bigint references public.roles(id)
 );
 
 alter table public.usuarios
   add column if not exists usuario text,
   add column if not exists password_hash text,
+  add column if not exists tipo_plan text not null default 'Gratuito',
   add column if not exists rol_id bigint references public.roles(id);
 
 create unique index if not exists usuarios_usuario_unique

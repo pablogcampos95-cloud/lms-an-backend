@@ -129,6 +129,7 @@ async function startSession(usuario) {
   document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   renderMenu();
   showApp();
+  renderCurrentPlan();
   showView('dashboard');
   await Promise.allSettled([loadDashboard(), loadRoles(), loadUsers(), loadCourses()]);
 }
@@ -180,6 +181,24 @@ function showView(viewName) {
   });
 
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
+  if (viewName === 'plan') renderCurrentPlan();
+}
+
+function renderCurrentPlan() {
+  const usuario = AppState.usuario || {};
+  const tipoPlan = usuario.tipo_plan === 'Pagado' ? 'Pagado' : 'Gratuito';
+  const isPaid = tipoPlan === 'Pagado';
+  const name = document.getElementById('currentPlanName');
+  if (!name) return;
+
+  name.textContent = isPaid ? 'Plan pagado' : 'Plan gratuito';
+  document.getElementById('currentPlanBadge').textContent = isPaid ? 'PREMIUM' : 'GRATUITO';
+  document.getElementById('currentPlanDescription').textContent = isPaid
+    ? 'Acceso completo a las experiencias, rutas y recursos habilitados por tu organizacion.'
+    : 'Acceso a los cursos y recursos gratuitos habilitados para tu cuenta.';
+  document.getElementById('currentPlanIcon').className = isPaid ? 'fa-solid fa-crown' : 'fa-solid fa-seedling';
+  document.getElementById('currentPlanCard').classList.toggle('plan-card-paid', isPaid);
+  document.getElementById('currentPlanUser').textContent = usuario.Nombres || usuario.usuario || 'Usuario';
 }
 
 function showModuleNotice(moduleName) {
@@ -272,13 +291,13 @@ function renderRoleOptions() {
 
 async function loadUsers() {
   const tbody = document.getElementById('usersTableBody');
-  tbody.innerHTML = '<tr><td colspan="9"><div class="skeleton"></div></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10"><div class="skeleton"></div></td></tr>';
 
   try {
     AppState.usuarios = await UsuariosService.listar();
     renderUsersTable();
   } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-warning">${error.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-warning">${error.message}</td></tr>`;
   }
 }
 
@@ -293,7 +312,7 @@ function renderUsersTable() {
   });
 
   if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-secondary">No hay usuarios para mostrar.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-secondary">No hay usuarios para mostrar.</td></tr>';
     return;
   }
 
@@ -307,6 +326,7 @@ function renderUsersTable() {
       <td><span class="badge ${user.Estado === 'Activo' ? 'text-bg-success' : 'text-bg-secondary'}">${escapeHtml(user.Estado || '')}</span></td>
       <td>${escapeHtml(user.usuario || '')}</td>
       <td>${escapeHtml(user.rol ? user.rol.nombre : '')}</td>
+      <td><span class="badge ${user.tipo_plan === 'Pagado' ? 'plan-badge-paid' : 'badge-soft'}">${escapeHtml(user.tipo_plan || 'Gratuito')}</span></td>
       <td class="text-end">
         <button class="btn btn-outline-light btn-sm me-1" type="button" onclick="openEditUserModal(${user.id})"><i class="fa-solid fa-pen"></i></button>
         <button class="btn btn-outline-danger btn-sm" type="button" onclick="confirmDeleteUser(${user.id})"><i class="fa-solid fa-trash"></i></button>
@@ -320,6 +340,7 @@ function openCreateUserModal() {
   document.getElementById('userForm').reset();
   document.getElementById('userId').value = '';
   document.getElementById('fieldEstado').value = 'Activo';
+  document.getElementById('fieldTipoPlan').value = 'Gratuito';
   document.getElementById('fieldPassword').required = true;
   AppState.userModal.show();
 }
@@ -340,6 +361,7 @@ function openEditUserModal(id) {
   document.getElementById('fieldFechaIngreso').value = user.fecha_ingreso || '';
   document.getElementById('fieldUsuario').value = user.usuario || '';
   document.getElementById('fieldRol').value = user.rol_id || '';
+  document.getElementById('fieldTipoPlan').value = user.tipo_plan || 'Gratuito';
   document.getElementById('fieldPassword').value = '';
   document.getElementById('fieldPassword').required = false;
   AppState.userModal.show();
@@ -359,6 +381,7 @@ async function handleSaveUser(event) {
     fecha_ingreso: document.getElementById('fieldFechaIngreso').value,
     usuario: document.getElementById('fieldUsuario').value.trim(),
     rol_id: Number(document.getElementById('fieldRol').value),
+    tipo_plan: document.getElementById('fieldTipoPlan').value,
   };
 
   const password = document.getElementById('fieldPassword').value;
@@ -401,7 +424,7 @@ async function confirmDeleteUser(id) {
 }
 
 function exportUsersCsv() {
-  const headers = ['DNI', 'Nombres', 'Correo', 'Cargo', 'Campana', 'Supervisor', 'Estado', 'Fecha ingreso', 'Usuario', 'Rol'];
+  const headers = ['DNI', 'Nombres', 'Correo', 'Cargo', 'Campana', 'Supervisor', 'Estado', 'Fecha ingreso', 'Usuario', 'Rol', 'Plan'];
   const rows = AppState.usuarios.map((user) => [
     user.DNI,
     user.Nombres,
@@ -413,6 +436,7 @@ function exportUsersCsv() {
     user.fecha_ingreso,
     user.usuario,
     user.rol ? user.rol.nombre : '',
+    user.tipo_plan || 'Gratuito',
   ]);
 
   const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n');

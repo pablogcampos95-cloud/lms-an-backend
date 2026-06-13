@@ -28,6 +28,7 @@ const sanitizeUsuario = (usuario) => {
     ...safeUsuario,
     nombre: safeUsuario.Nombres,
     rol_nombre: safeUsuario.rol ? safeUsuario.rol.nombre : null,
+    tipo_plan: safeUsuario.tipo_plan || 'Gratuito',
   };
 };
 
