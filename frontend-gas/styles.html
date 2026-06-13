@@ -68,6 +68,7 @@
   }
 
   .brand-logo { display: block; max-width: 100%; height: auto; object-fit: contain; }
+  .brand-logo[src=""], .brand-logo:not([src]) { display: none; }
   .brand-logo-login { width: min(250px, 76%); max-height: 105px; margin: 0 auto; }
   .brand-logo-shell { width: 52px; height: 52px; padding: 6px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,0.04); }
   .brand-logo-shell .brand-logo { max-height: 38px; }
