@@ -30,6 +30,35 @@ create table if not exists public.evaluaciones (
   updated_at timestamptz not null default now()
 );
 
+-- Compatibilidad con una tabla evaluaciones creada por una version anterior.
+-- CREATE TABLE IF NOT EXISTS conserva la tabla antigua, pero no agrega columnas.
+alter table public.evaluaciones
+  add column if not exists curso_id bigint,
+  add column if not exists modulo_id bigint,
+  add column if not exists leccion_id bigint,
+  add column if not exists titulo text,
+  add column if not exists descripcion text,
+  add column if not exists ubicacion text default 'FinModulo',
+  add column if not exists estado text default 'Borrador',
+  add column if not exists fecha_inicio timestamptz,
+  add column if not exists fecha_limite timestamptz,
+  add column if not exists tiempo_limite_min integer,
+  add column if not exists intentos_permitidos integer default 1,
+  add column if not exists puntaje_minimo numeric(6,2) default 70,
+  add column if not exists mostrar_resultado boolean default true,
+  add column if not exists mostrar_correctas boolean default false,
+  add column if not exists permitir_retroalimentacion boolean default true,
+  add column if not exists preguntas_aleatorias boolean default false,
+  add column if not exists alternativas_aleatorias boolean default false,
+  add column if not exists obligatoria boolean default false,
+  add column if not exists bloquea_avance boolean default false,
+  add column if not exists condicion_desbloqueo text default 'Responder',
+  add column if not exists permitir_reintentos boolean default true,
+  add column if not exists mensaje_bloqueo text,
+  add column if not exists creado_por bigint,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
 create table if not exists public.evaluacion_preguntas (
   id bigserial primary key,
   evaluacion_id bigint not null references public.evaluaciones(id) on delete cascade,
@@ -46,6 +75,19 @@ create table if not exists public.evaluacion_preguntas (
   unique (evaluacion_id, orden)
 );
 
+alter table public.evaluacion_preguntas
+  add column if not exists evaluacion_id bigint,
+  add column if not exists enunciado text,
+  add column if not exists tipo text default 'TextoCorto',
+  add column if not exists puntaje numeric(8,2) default 1,
+  add column if not exists explicacion text,
+  add column if not exists criterios_evaluacion text,
+  add column if not exists guia_instructor text,
+  add column if not exists calificacion_parcial boolean default false,
+  add column if not exists orden integer default 1,
+  add column if not exists activo boolean default true,
+  add column if not exists created_at timestamptz default now();
+
 create table if not exists public.evaluacion_opciones (
   id bigserial primary key,
   pregunta_id bigint not null references public.evaluacion_preguntas(id) on delete cascade,
@@ -54,6 +96,12 @@ create table if not exists public.evaluacion_opciones (
   orden integer not null default 1,
   unique (pregunta_id, orden)
 );
+
+alter table public.evaluacion_opciones
+  add column if not exists pregunta_id bigint,
+  add column if not exists texto text,
+  add column if not exists es_correcta boolean default false,
+  add column if not exists orden integer default 1;
 
 create table if not exists public.evaluacion_intentos (
   id bigserial primary key,
@@ -70,6 +118,18 @@ create table if not exists public.evaluacion_intentos (
   unique (evaluacion_id, usuario_id, numero_intento)
 );
 
+alter table public.evaluacion_intentos
+  add column if not exists evaluacion_id bigint,
+  add column if not exists usuario_id bigint,
+  add column if not exists numero_intento integer default 1,
+  add column if not exists estado text default 'EnProgreso',
+  add column if not exists puntaje_obtenido numeric(10,2) default 0,
+  add column if not exists puntaje_total numeric(10,2) default 0,
+  add column if not exists porcentaje numeric(6,2) default 0,
+  add column if not exists iniciado_at timestamptz default now(),
+  add column if not exists enviado_at timestamptz,
+  add column if not exists calificado_at timestamptz;
+
 create table if not exists public.evaluacion_respuestas (
   id bigserial primary key,
   intento_id bigint not null references public.evaluacion_intentos(id) on delete cascade,
@@ -85,6 +145,19 @@ create table if not exists public.evaluacion_respuestas (
   calificado_at timestamptz,
   unique (intento_id, pregunta_id)
 );
+
+alter table public.evaluacion_respuestas
+  add column if not exists intento_id bigint,
+  add column if not exists pregunta_id bigint,
+  add column if not exists opcion_id bigint,
+  add column if not exists opciones_ids jsonb,
+  add column if not exists respuesta_texto text,
+  add column if not exists puntaje_obtenido numeric(8,2),
+  add column if not exists correcta boolean,
+  add column if not exists requiere_revision boolean default false,
+  add column if not exists retroalimentacion text,
+  add column if not exists calificado_por bigint,
+  add column if not exists calificado_at timestamptz;
 
 create table if not exists public.foros_evaluables (
   id bigserial primary key,
@@ -111,6 +184,29 @@ create table if not exists public.foros_evaluables (
   updated_at timestamptz not null default now()
 );
 
+alter table public.foros_evaluables
+  add column if not exists curso_id bigint,
+  add column if not exists modulo_id bigint,
+  add column if not exists leccion_id bigint,
+  add column if not exists titulo text,
+  add column if not exists descripcion text,
+  add column if not exists instrucciones text,
+  add column if not exists ubicacion text default 'FinModulo',
+  add column if not exists archivo_url text,
+  add column if not exists archivo_nombre text,
+  add column if not exists fecha_inicio timestamptz,
+  add column if not exists fecha_limite timestamptz,
+  add column if not exists estado text default 'Borrador',
+  add column if not exists visibilidad text default 'SoloInstructor',
+  add column if not exists obligatorio boolean default false,
+  add column if not exists bloquea_avance boolean default false,
+  add column if not exists condicion_desbloqueo text default 'Responder',
+  add column if not exists minimo_estrellas integer default 1,
+  add column if not exists mensaje_bloqueo text,
+  add column if not exists creado_por bigint,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
 create table if not exists public.foro_respuestas (
   id bigserial primary key,
   foro_id bigint not null references public.foros_evaluables(id) on delete cascade,
@@ -126,6 +222,19 @@ create table if not exists public.foro_respuestas (
   calificado_at timestamptz,
   unique (foro_id, usuario_id)
 );
+
+alter table public.foro_respuestas
+  add column if not exists foro_id bigint,
+  add column if not exists usuario_id bigint,
+  add column if not exists texto text,
+  add column if not exists archivo_url text,
+  add column if not exists archivo_nombre text,
+  add column if not exists estado text default 'Enviado',
+  add column if not exists estrellas integer,
+  add column if not exists retroalimentacion text,
+  add column if not exists calificado_por bigint,
+  add column if not exists enviado_at timestamptz default now(),
+  add column if not exists calificado_at timestamptz;
 
 create index if not exists evaluaciones_curso_idx on public.evaluaciones(curso_id, estado);
 create index if not exists preguntas_evaluacion_idx on public.evaluacion_preguntas(evaluacion_id, orden);
