@@ -1,0 +1,31 @@
+<section id="view-student-courses" class="view" data-title="Mis cursos">
+  <div class="student-courses-heading">
+    <div>
+      <span class="eyebrow">MI APRENDIZAJE</span>
+      <h1>Mis cursos</h1>
+      <p>Continua los cursos que tienes asignados y revisa tu avance.</p>
+    </div>
+    <div class="student-courses-summary">
+      <div><strong id="studentCoursesTotal">0</strong><span>Asignados</span></div>
+      <div><strong id="studentCoursesInProgress">0</strong><span>En progreso</span></div>
+      <div><strong id="studentCoursesCompleted">0</strong><span>Completados</span></div>
+    </div>
+  </div>
+
+  <div class="student-courses-toolbar">
+    <label class="student-course-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input id="studentCourseSearch" type="search" placeholder="Buscar en mis cursos" aria-label="Buscar en mis cursos">
+    </label>
+    <select id="studentCourseProgressFilter" class="form-select" aria-label="Filtrar cursos por avance">
+      <option value="all">Todos los estados</option>
+      <option value="not-started">No iniciados</option>
+      <option value="in-progress">En progreso</option>
+      <option value="completed">Completados</option>
+    </select>
+  </div>
+
+  <div id="studentCoursesGrid" class="student-courses-grid">
+    <div class="empty-state">Cargando tus cursos...</div>
+  </div>
+</section>

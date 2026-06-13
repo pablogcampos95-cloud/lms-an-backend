@@ -45,7 +45,7 @@ const MENUS = {
   ],
   Estudiante: [
     ['dashboard', 'fa-chart-line', 'Inicio'],
-    ['cursos', 'fa-graduation-cap', 'Mis cursos'],
+    ['student-courses', 'fa-graduation-cap', 'Mis cursos'],
     ['evaluaciones', 'fa-clipboard-check', 'Mis evaluaciones'],
     ['certificados', 'fa-award', 'Mis certificados'],
   ],
@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('previewCourse').addEventListener('click', previewCurrentCourse);
   document.getElementById('assignCourseStudents').addEventListener('click', openCourseAssignmentModal);
   document.getElementById('saveCourseAssignments').addEventListener('click', saveCourseAssignments);
+  document.getElementById('studentCourseSearch').addEventListener('input', renderStudentCoursesCatalog);
+  document.getElementById('studentCourseProgressFilter').addEventListener('change', renderStudentCoursesCatalog);
 
   boot();
 });
@@ -201,6 +203,9 @@ function renderMenu() {
 }
 
 function showView(viewName) {
+  const studentBlockedViews = ['usuarios', 'cursos', 'modulos', 'lecciones', 'reportes', 'configuracion', 'administracion'];
+  if (isStudent() && studentBlockedViews.includes(viewName)) viewName = 'student-courses';
+  if (!isStudent() && viewName === 'student-courses') viewName = 'cursos';
   let target = document.getElementById(`view-${viewName}`);
   if (!target) {
     target = document.getElementById('view-not-found');
@@ -215,8 +220,13 @@ function showView(viewName) {
 
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
   if (viewName === 'plan') renderCurrentPlan();
+  if (isStudent() && viewName === 'student-courses') loadStudentCourses();
   if (isStudent() && viewName === 'evaluaciones') loadStudentEvaluations();
   if (isStudent() && viewName === 'certificados') loadStudentCertificates();
+}
+
+function showCoursesHome() {
+  showView(isStudent() ? 'student-courses' : 'cursos');
 }
 
 function renderCurrentPlan() {
@@ -347,8 +357,83 @@ function renderStudentDashboard(data) {
 }
 
 async function openStudentCourse(id) {
-  showView('cursos');
-  await openCourseEditor(id);
+  if (!isStudent()) {
+    await openCourseEditor(id);
+    return;
+  }
+  try {
+    AppState.cursoActual = await CursosService.aprender(id);
+    AppState.previewMode = false;
+    AppState.studentLessons = (AppState.cursoActual.modulos || []).flatMap((modulo) =>
+      (modulo.lecciones || []).map((leccion) => ({ ...leccion, modulo_nombre: modulo.nombre }))
+    );
+    const firstPending = AppState.studentLessons.findIndex((leccion) => !(leccion.progreso && leccion.progreso.completado));
+    AppState.studentLessonIndex = firstPending >= 0 ? firstPending : Math.max(AppState.studentLessons.length - 1, 0);
+    renderStudentCoursePlayer();
+    AppState.coursePreviewModal.show();
+  } catch (error) {
+    Swal.fire('No se pudo abrir el curso', error.message, 'error');
+  }
+}
+
+async function loadStudentCourses() {
+  if (!isStudent()) return;
+  const grid = document.getElementById('studentCoursesGrid');
+  grid.innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando tus cursos...</div>';
+  try {
+    const data = await DashboardService.general();
+    AppState.dashboardData = data;
+    renderStudentCoursesCatalog();
+  } catch (error) {
+    grid.innerHTML = `<div class="empty-state text-warning">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function studentCourseState(course) {
+  const progress = Number(course.avance || 0);
+  if (progress >= 100) return { key: 'completed', label: 'Completado', action: 'Ver curso', icon: 'fa-circle-check' };
+  if (progress > 0) return { key: 'in-progress', label: 'En progreso', action: 'Reanudar curso', icon: 'fa-play' };
+  return { key: 'not-started', label: 'No iniciado', action: 'Iniciar curso', icon: 'fa-play' };
+}
+
+function renderStudentCoursesCatalog() {
+  if (!isStudent()) return;
+  const courses = (AppState.dashboardData && AppState.dashboardData.cursos) || [];
+  const search = (document.getElementById('studentCourseSearch').value || '').trim().toLowerCase();
+  const filter = document.getElementById('studentCourseProgressFilter').value;
+  const visible = courses.filter((course) => {
+    const state = studentCourseState(course);
+    const matchesSearch = `${course.nombre || ''} ${course.categoria || ''}`.toLowerCase().includes(search);
+    return matchesSearch && (filter === 'all' || state.key === filter);
+  });
+  document.getElementById('studentCoursesTotal').textContent = courses.length;
+  document.getElementById('studentCoursesInProgress').textContent = courses.filter((course) => studentCourseState(course).key === 'in-progress').length;
+  document.getElementById('studentCoursesCompleted').textContent = courses.filter((course) => studentCourseState(course).key === 'completed').length;
+  document.getElementById('studentCoursesGrid').innerHTML = visible.length ? visible.map((course) => {
+    const state = studentCourseState(course);
+    const progress = Math.min(100, Math.max(0, Number(course.avance || 0)));
+    const completed = Number(course.lecciones_completadas || 0);
+    const total = Number(course.total_lecciones || 0);
+    return `<article class="student-catalog-card">
+      <div class="student-catalog-cover">
+        ${course.imagen_portada_url ? `<img src="${escapeHtml(course.imagen_portada_url)}" alt="Portada de ${escapeHtml(course.nombre)}">` : '<div class="student-catalog-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>'}
+        <span class="student-course-state ${state.key}">${state.label}</span>
+      </div>
+      <div class="student-catalog-body">
+        <span class="course-category">${escapeHtml(course.categoria || 'CURSO')}</span>
+        <h2>${escapeHtml(course.nombre)}</h2>
+        <p>${escapeHtml(course.descripcion_corta || 'Curso asignado a tu plan de aprendizaje.')}</p>
+        <div class="student-course-details">
+          <span><i class="fa-regular fa-clock"></i>${course.duracion_estimada_min || 0} min</span>
+          <span><i class="fa-solid fa-layer-group"></i>${course.cantidad_modulos || 0} modulos</span>
+          <span><i class="fa-solid fa-list-check"></i>${completed}/${total} pasos</span>
+        </div>
+        <div class="student-course-progress-copy"><span>Tu avance</span><strong>${progress}%</strong></div>
+        <div class="progress premium-progress" role="progressbar" aria-label="Avance del curso" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${progress}%"></div></div>
+        <button class="btn student-course-primary" type="button" onclick="openStudentCourse(${course.id})"><i class="fa-solid ${state.icon}"></i>${state.action}</button>
+      </div>
+    </article>`;
+  }).join('') : '<div class="empty-state student-courses-empty"><i class="fa-solid fa-book-open fa-2x mb-3"></i><strong>No encontramos cursos</strong><span>Cuando tengas cursos asignados apareceran en esta seccion.</span></div>';
 }
 
 async function loadStudentEvaluations() {
@@ -704,8 +789,13 @@ async function saveCourse(event) {
 }
 
 async function openCourseEditor(id) {
+  if (!canManageCourses()) {
+    showView('student-courses');
+    Swal.fire('Acceso restringido', 'No tienes permisos para acceder al editor de cursos.', 'warning');
+    return;
+  }
   try {
-    AppState.cursoActual = canManageCourses() ? await CursosService.obtener(id) : await CursosService.aprender(id);
+    AppState.cursoActual = await CursosService.obtener(id);
     document.getElementById('coursesListPanel').classList.add('d-none');
     document.getElementById('courseEditorPanel').classList.remove('d-none');
     document.getElementById('editorCourseName').textContent = AppState.cursoActual.nombre;
@@ -908,5 +998,5 @@ function renderStudentCourseOutline() {
 function selectStudentLesson(index) { AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
 
 function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentCoursePlayer(); }
-async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
+async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
 </script>
