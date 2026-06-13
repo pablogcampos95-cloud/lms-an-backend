@@ -1,3 +1,4 @@
+<script>
 const AuthService = {
   async login(usuario, password) {
     const result = await ApiService.request('/api/auth/login', {
@@ -19,3 +20,4 @@ const AuthService = {
     ApiService.clearSession();
   },
 };
+</script>

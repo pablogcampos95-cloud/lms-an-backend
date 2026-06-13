@@ -1,3 +1,4 @@
+<script>
 const CursosService = {
   async listar(params = {}) {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
@@ -25,3 +26,4 @@ const CursosService = {
   },
   async completarLeccion(id, completado = true) { return (await ApiService.request(`/api/lecciones/${id}/completar`, { method: 'PATCH', body: JSON.stringify({ completado }) })).data; },
 };
+</script>

@@ -1,3 +1,4 @@
+<script>
 const AppState = {
   usuario: null,
   usuarios: [],
@@ -685,3 +686,4 @@ function renderStudentLesson() {
 
 function navigateStudentLesson(offset) { AppState.studentLessonIndex += offset; renderStudentLesson(); }
 async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentLesson(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
+</script>
