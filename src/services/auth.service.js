@@ -5,7 +5,7 @@ const supabase = require('./supabase.service');
 const usuariosService = require('./usuarios.service');
 const AppError = require('../utils/AppError');
 
-const login = async ({ usuario, password }) => {
+const login = async ({ usuario, password, rememberMe = false }) => {
   const { data, error } = await supabase
     .from('usuarios')
     .select('*, rol:roles(id,nombre,descripcion)')
@@ -37,7 +37,7 @@ const login = async ({ usuario, password }) => {
       rol: data.rol ? data.rol.nombre : null,
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    { expiresIn: rememberMe ? (process.env.JWT_REMEMBER_EXPIRES_IN || '30d') : (process.env.JWT_EXPIRES_IN || '8h') }
   );
 
   return {

@@ -1,9 +1,9 @@
 <script>
 const AuthService = {
-  async login(usuario, password) {
+  async login(usuario, password, rememberMe = false) {
     const result = await ApiService.request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ usuario, password }),
+      body: JSON.stringify({ usuario, password, rememberMe }),
     });
 
     ApiService.setSession(result.token, result.usuario);

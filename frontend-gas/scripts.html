@@ -107,9 +107,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('forumResponseForm').addEventListener('submit', submitForumResponse);
   document.getElementById('studentCourseSearch').addEventListener('input', renderStudentCoursesCatalog);
   document.getElementById('studentCourseProgressFilter').addEventListener('change', renderStudentCoursesCatalog);
+  window.addEventListener('auth:expired', handleExpiredSession);
 
   boot();
 });
+
+function handleExpiredSession() {
+  AuthService.logout();
+  AppState.usuario = null;
+  document.querySelectorAll('.modal.show').forEach((element) => {
+    const instance = bootstrap.Modal.getInstance(element);
+    if (instance) instance.hide();
+  });
+  document.querySelectorAll('.modal-backdrop').forEach((element) => element.remove());
+  document.body.classList.remove('modal-open');
+  document.body.style.removeProperty('padding-right');
+  if (typeof Swal !== 'undefined') Swal.close();
+  showLogin();
+  setTimeout(() => Swal.fire('Sesion expirada', 'Vuelve a iniciar sesion para continuar con tu curso.', 'info'), 50);
+}
 
 async function boot() {
   const token = ApiService.getToken();
@@ -137,7 +153,7 @@ async function handleLogin(event) {
   button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ingresando';
 
   try {
-    const sessionUser = await AuthService.login(usuario, password);
+    const sessionUser = await AuthService.login(usuario, password, document.getElementById('rememberMe').checked);
     await startSession(sessionUser);
     Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title: 'Sesion iniciada' });
   } catch (error) {
@@ -389,6 +405,7 @@ async function openStudentCourse(id) {
     renderStudentCoursePlayer();
     AppState.coursePreviewModal.show();
   } catch (error) {
+    if (error.status === 401) return;
     Swal.fire('No se pudo abrir el curso', error.message, 'error');
   }
 }

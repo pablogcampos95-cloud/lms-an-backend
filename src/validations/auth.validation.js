@@ -1,7 +1,7 @@
 const AppError = require('../utils/AppError');
 
 const validateLogin = (req, res, next) => {
-  const { usuario, password } = req.body;
+  const { usuario, password, rememberMe } = req.body;
   const errors = [];
 
   if (!usuario || typeof usuario !== 'string') {
@@ -19,6 +19,7 @@ const validateLogin = (req, res, next) => {
   req.body = {
     usuario: usuario.trim(),
     password,
+    rememberMe: rememberMe === true,
   };
 
   return next();
