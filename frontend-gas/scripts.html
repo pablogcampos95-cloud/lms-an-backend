@@ -408,7 +408,8 @@ async function openStudentCourse(id) {
     AppState.studentLessonIndex = firstPending >= 0 ? firstPending : Math.max(AppState.studentLessons.length - 1, 0);
     renderStudentCoursePlayer();
     document.querySelectorAll('.modal-backdrop').forEach((element) => element.remove());
-    AppState.coursePreviewModal.show();
+    document.body.classList.remove('modal-open');
+    showView('student-course-player');
   } catch (error) {
     if (error.status === 401) return;
     Swal.fire('No se pudo abrir el curso', error.message, 'error');
@@ -1159,19 +1160,26 @@ function openStudentLesson(index) {
   AppState.studentLessonIndex = index;
   AppState.previewMode = false;
   renderStudentCoursePlayer();
-  AppState.coursePreviewModal.show();
+  if (isStudent()) showView('student-course-player');
+  else AppState.coursePreviewModal.show();
+}
+
+function getStudentPlayerContainer() {
+  if (isStudent() && !AppState.previewMode) return document.getElementById('studentCoursePlayerBody');
+  return document.getElementById('coursePreviewBody');
 }
 
 function renderStudentCoursePlayer() {
   const leccion = AppState.studentLessons[AppState.studentLessonIndex];
   const curso = AppState.cursoActual;
+  const container = getStudentPlayerContainer();
   if (!leccion) {
-    document.getElementById('coursePreviewBody').innerHTML = '<div class="empty-state">Este curso todavia no tiene pasos disponibles.</div>';
+    container.innerHTML = '<div class="empty-state m-4">Este curso todavia no tiene pasos disponibles.</div>';
     return;
   }
   const cover = curso.imagen_portada_url ? `style="background-image:linear-gradient(90deg,rgba(2,13,31,.94),rgba(2,20,42,.55)),url('${escapeHtml(curso.imagen_portada_url)}')"` : '';
   const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
-  document.getElementById('coursePreviewBody').innerHTML = `
+  container.innerHTML = `
     <div class="student-course-player">
       <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
       <div class="student-player-layout">

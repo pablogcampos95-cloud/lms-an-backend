@@ -384,6 +384,10 @@
   .course-player-dialog .modal-content { height: 100%; overflow: hidden; }
   .course-player-modal-body { padding: 0; overflow: auto; }
   .student-course-player { min-height: 100%; background: #051329; }
+  .student-course-page-toolbar { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
+  .student-course-page-toolbar span { color:var(--cyan);font-size:.78rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase; }
+  .student-course-page-body { overflow:hidden;border:1px solid var(--line-strong);border-radius:24px;box-shadow:var(--shadow);background:#051329; }
+  .student-course-page-body .student-course-player { min-height:calc(100vh - 190px); }
   .student-player-cover { min-height: 250px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 38px 42px; color: #fff; background-color: #092143; background-position: center center; background-repeat: no-repeat; background-size: cover; }
   .student-player-cover h2 { max-width: 900px; margin: 8px 0; font-size: clamp(1.8rem, 3vw, 3rem); }.student-player-cover p { max-width: 760px; margin: 0; color: #d7e4f2; }
   .student-player-progress { display: grid; place-items: center; flex: 0 0 92px; width: 92px; height: 92px; border: 1px solid rgba(35,224,199,.5); border-radius: 50%; background: rgba(2,15,36,.75); }.student-player-progress strong { color: var(--cyan); font-size: 1.3rem; }.student-player-progress span { color: var(--muted); font-size: .7rem; }
@@ -706,6 +710,7 @@
     .student-player-progress { width: 72px; height: 72px; }
     .student-player-actions { align-items: stretch; flex-direction: column; }
     .student-player-actions .btn { width: 100%; }
+    .student-course-page-toolbar { align-items:flex-start;flex-direction:column; }
     .student-lesson-heading { flex-direction: column; }
     .student-courses-toolbar { flex-direction:column; }.student-courses-toolbar .form-select { width:100%; }.student-courses-summary { grid-template-columns:1fr; }.student-courses-summary div { display:flex;align-items:center;justify-content:space-between; }
     .evaluation-page-heading,.evaluation-filters{align-items:stretch;flex-direction:column}.evaluation-filters .form-select{max-width:none}.evaluation-metrics{grid-template-columns:1fr}.evaluation-admin-card{align-items:flex-start;flex-direction:column}.journey-activity{flex-direction:column}
