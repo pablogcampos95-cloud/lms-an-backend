@@ -28,6 +28,20 @@ const AppState = {
   evaluationHasAttempts: false,
 };
 
+const loginContent = Object.freeze({
+  title: 'IA Learning Solutions',
+  subtitle: 'Conecta. Conoce. Convierte.',
+  badgeOne: 'Acceso seguro',
+  badgeTwo: 'Datos protegidos',
+});
+
+function renderLoginContent() {
+  document.getElementById('loginContentTitle').textContent = loginContent.title;
+  document.getElementById('loginContentSubtitle').textContent = loginContent.subtitle;
+  document.getElementById('loginContentBadgeOne').textContent = loginContent.badgeOne;
+  document.getElementById('loginContentBadgeTwo').textContent = loginContent.badgeTwo;
+}
+
 const MENUS = {
   Administrador: [
     ['dashboard', 'fa-chart-line', 'Dashboard'],
@@ -62,6 +76,8 @@ const MENUS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  renderLoginContent();
+
   // Los modales viven originalmente dentro de vistas que pueden estar ocultas.
   // Bootstrap necesita que sean hijos directos del body para mostrarlos desde cualquier rol.
   document.querySelectorAll('.modal').forEach((modal) => document.body.appendChild(modal));

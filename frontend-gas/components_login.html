@@ -2,10 +2,12 @@
   <div class="login-panel">
     <div class="login-brand text-center mb-4">
       <img class="brand-logo brand-logo-login" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
-      <h1 class="h3 mt-4 mb-2 fw-bold">IA Learning Solutions</h1>
-      <p class="login-tagline mb-1">Aprendizaje corporativo impulsado por IA.</p>
-      <p class="text-secondary mb-0">Transformamos conocimiento en resultados.</p>
-      <div class="login-trust"><span><i class="fa-solid fa-shield-halved"></i> Acceso seguro</span><span><i class="fa-solid fa-bolt"></i> Experiencia inteligente</span></div>
+      <h1 id="loginContentTitle" class="h3 mt-4 mb-2 fw-bold"></h1>
+      <p id="loginContentSubtitle" class="login-tagline mb-0"></p>
+      <div class="login-trust">
+        <span><i class="fa-solid fa-shield-halved"></i> <span id="loginContentBadgeOne"></span></span>
+        <span><i class="fa-solid fa-lock"></i> <span id="loginContentBadgeTwo"></span></span>
+      </div>
     </div>
 
     <form id="loginForm" class="vstack gap-3">
