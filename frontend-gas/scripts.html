@@ -62,6 +62,10 @@ const MENUS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Los modales viven originalmente dentro de vistas que pueden estar ocultas.
+  // Bootstrap necesita que sean hijos directos del body para mostrarlos desde cualquier rol.
+  document.querySelectorAll('.modal').forEach((modal) => document.body.appendChild(modal));
+
   AppState.userModal = new bootstrap.Modal(document.getElementById('userModal'));
   AppState.courseModal = new bootstrap.Modal(document.getElementById('courseModal'));
   AppState.moduleModal = new bootstrap.Modal(document.getElementById('moduleModal'));
@@ -403,6 +407,7 @@ async function openStudentCourse(id) {
     const firstPending = AppState.studentLessons.findIndex((item) => !item.completada && !(item.progreso && item.progreso.completado));
     AppState.studentLessonIndex = firstPending >= 0 ? firstPending : Math.max(AppState.studentLessons.length - 1, 0);
     renderStudentCoursePlayer();
+    document.querySelectorAll('.modal-backdrop').forEach((element) => element.remove());
     AppState.coursePreviewModal.show();
   } catch (error) {
     if (error.status === 401) return;
