@@ -7,6 +7,16 @@ const throwSupabaseError = (error) => {
   if (error) throw new AppError('Error al consultar Supabase', 500, error.message);
 };
 
+const buildCertificateCode = (usuarioId, cursoId) => (
+  `IALS-${usuarioId}-${cursoId}-${crypto.createHash('sha1').update(`${usuarioId}:${cursoId}`).digest('hex').slice(0, 8).toUpperCase()}`
+);
+
+const isCertificateSchemaError = (error) => {
+  if (!error) return false;
+  const message = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ');
+  return /schema cache|column .*does not exist|Could not find .* column|PGRST204|42703|codigo|emitido_at/i.test(message);
+};
+
 const getAssignedCourseIds = async (usuarioId) => {
   const { data, error } = await supabase
     .from('curso_asignaciones')
@@ -65,9 +75,9 @@ const getAssignedCoursesProgress = async (usuarioId) => {
 const syncCertificates = async (usuarioId, courses) => {
   const completed = courses.filter((course) => course.total_lecciones > 0 && course.avance === 100);
   for (const course of completed) {
-    const codigo = `IALS-${usuarioId}-${course.id}-${crypto.createHash('sha1').update(`${usuarioId}:${course.id}`).digest('hex').slice(0, 8).toUpperCase()}`;
+    const codigo = buildCertificateCode(usuarioId, course.id);
     const { error } = await supabase.from('certificados').upsert({ usuario_id: usuarioId, curso_id: course.id, codigo }, { onConflict: 'usuario_id,curso_id' });
-    throwSupabaseError(error);
+    if (error && !isCertificateSchemaError(error)) throwSupabaseError(error);
     await supabase.from('curso_asignaciones').update({ estado: 'Completado' }).eq('usuario_id', usuarioId).eq('curso_id', course.id);
   }
 };
@@ -105,8 +115,19 @@ const getCertificates = async (usuarioId) => {
   const courses = await getAssignedCoursesProgress(usuarioId);
   await syncCertificates(usuarioId, courses);
   const { data, error } = await supabase.from('certificados').select('id,codigo,emitido_at,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId).order('emitido_at', { ascending: false });
-  throwSupabaseError(error);
-  return data;
+  if (!error) return data;
+  if (!isCertificateSchemaError(error)) throwSupabaseError(error);
+
+  const fallback = await supabase.from('certificados').select('id,curso_id,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId);
+  if (fallback.error) {
+    if (isCertificateSchemaError(fallback.error)) return [];
+    throwSupabaseError(fallback.error);
+  }
+  return fallback.data.map((certificate) => ({
+    ...certificate,
+    codigo: buildCertificateCode(usuarioId, certificate.curso_id || certificate.curso?.id),
+    emitido_at: null,
+  }));
 };
 
 const getAssignments = async (usuarioId) => {
