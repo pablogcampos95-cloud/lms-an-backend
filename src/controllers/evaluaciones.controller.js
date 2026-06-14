@@ -31,6 +31,7 @@ module.exports = {
     return ok(res, await service.saveForum(req.user, { ...forum, archivo_url: publicData.publicUrl, archivo_nombre: req.file.originalname }, forum.id), 'Archivo adjuntado');
   },
   eliminarForo: async (req, res) => ok(res, await service.removeForum(req.user, req.params.id), 'Foro eliminado'),
+  ordenarForo: async (req, res) => ok(res, await service.reorderForum(req.user, req.params.id, req.body.direction), 'Orden actualizado'),
   responderForo: async (req, res) => ok(res, await service.respondForum(req.user, req.params.id, req.body), 'Respuesta enviada'),
   resultadosForo: async (req, res) => ok(res, await service.forumResults(req.user, req.params.id)),
   calificarForo: async (req, res) => ok(res, await service.gradeForum(req.user, req.params.id, req.body), 'Foro calificado'),

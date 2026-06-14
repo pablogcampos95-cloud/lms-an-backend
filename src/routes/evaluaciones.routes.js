@@ -14,6 +14,7 @@ router.post('/foros', authorizeRoles('Administrador', 'Instructor'), asyncHandle
 router.get('/foros/:id', asyncHandler(controller.obtenerForo));
 router.put('/foros/:id', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.actualizarForo));
 router.post('/foros/:id/archivo', authorizeRoles('Administrador', 'Instructor'), upload.single('archivo'), asyncHandler(controller.subirArchivoForo));
+router.patch('/foros/:id/orden', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.ordenarForo));
 router.delete('/foros/:id', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.eliminarForo));
 router.post('/foros/:id/responder', authorizeRoles('Estudiante'), asyncHandler(controller.responderForo));
 router.get('/foros/:id/resultados', authorizeRoles('Administrador', 'Instructor'), asyncHandler(controller.resultadosForo));

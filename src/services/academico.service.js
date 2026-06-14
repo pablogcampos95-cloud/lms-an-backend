@@ -119,17 +119,17 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
     modulos.forEach((modulo) => {
       const moduleItems = [
         ...lecciones.filter((leccion) => Number(leccion.modulo_id) === Number(modulo.id)).map((leccion) => ({ ...leccion, tipo_secuencia: 'Leccion' })),
-        ...actividades.filter((actividad) => actividad.tipo_actividad === 'Evaluacion' && Number(actividad.modulo_id) === Number(modulo.id)).map((actividad) => ({ ...actividad, tipo_secuencia: 'Actividad' })),
+        ...actividades.filter((actividad) => actividad.orden != null && Number(actividad.modulo_id) === Number(modulo.id)).map((actividad) => ({ ...actividad, tipo_secuencia: 'Actividad' })),
       ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
       moduleItems.forEach((item) => {
         if (item.tipo_secuencia === 'Leccion') {
           if (locked) lockedLessonIds.add(item.id);
-          actividades.filter((actividad) => actividad.tipo_actividad !== 'Evaluacion' && actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(item.id)).forEach((actividad) => {
+          actividades.filter((actividad) => actividad.orden == null && actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(item.id)).forEach((actividad) => {
             if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
           });
         } else if (item.obligatoria && item.bloquea_avance && !item.completada) locked = true;
       });
-      actividades.filter((actividad) => actividad.tipo_actividad !== 'Evaluacion' && actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
+      actividades.filter((actividad) => actividad.orden == null && actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
         if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
       });
     });

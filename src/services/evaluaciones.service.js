@@ -152,6 +152,7 @@ const duplicate = async (user, id) => { const source = await detail(user, id); c
 const startAttempt = async (user, evaluationId) => {
   if (roleName(user) !== 'Estudiante') throw new AppError('Solo estudiantes pueden responder evaluaciones', 403);
   const evaluation = await detail(user, evaluationId);
+  await assertActivityUnlocked(user.id, evaluation.curso_id, 'Evaluacion', evaluationId);
   if (evaluation.fecha_inicio && new Date(evaluation.fecha_inicio) > new Date()) throw new AppError('La evaluacion aun no esta disponible', 409);
   if (evaluation.fecha_limite && new Date(evaluation.fecha_limite) < new Date()) throw new AppError('La evaluacion esta vencida', 409);
   const attempts = evaluation.intentos || [];
@@ -232,38 +233,74 @@ const listForums = async (user) => {
   fail(responseError);
   return visible.map((item) => ({ ...item, mi_respuesta: responses.find((response) => Number(response.foro_id) === Number(item.id)) || null }));
 };
-const saveForum = async (user, payload, id = null) => { const clean = { curso_id: Number(payload.curso_id), modulo_id: payload.modulo_id ? Number(payload.modulo_id) : null, leccion_id: payload.leccion_id ? Number(payload.leccion_id) : null, titulo: String(payload.titulo || '').trim(), descripcion: String(payload.descripcion || '').trim(), instrucciones: payload.instrucciones || null, ubicacion: payload.ubicacion || 'FinModulo', archivo_url: payload.archivo_url || null, archivo_nombre: payload.archivo_nombre || null, fecha_inicio: payload.fecha_inicio || null, fecha_limite: payload.fecha_limite || null, estado: payload.estado || 'Borrador', visibilidad: payload.visibilidad || 'SoloInstructor', obligatorio: Boolean(payload.obligatorio), bloquea_avance: Boolean(payload.bloquea_avance), condicion_desbloqueo: payload.condicion_desbloqueo || 'Responder', minimo_estrellas: Number(payload.minimo_estrellas || 1), mensaje_bloqueo: payload.mensaje_bloqueo || null }; if (!clean.curso_id || !clean.titulo || !clean.descripcion) throw new AppError('Curso, titulo y caso son obligatorios', 400); if (id) { const current = await getForum(id); await assertCourseAccess(user, current.curso_id); } await assertCourseAccess(user, clean.curso_id); const query = id ? supabase.from('foros_evaluables').update({ ...clean, updated_at: new Date().toISOString() }).eq('id', id) : supabase.from('foros_evaluables').insert({ ...clean, creado_por: user.id }); const { data, error } = await query.select('*').single(); fail(error); return data; };
+const saveForum = async (user, payload, id = null) => {
+  const clean = {
+    curso_id: Number(payload.curso_id), modulo_id: payload.modulo_id ? Number(payload.modulo_id) : null, leccion_id: payload.leccion_id ? Number(payload.leccion_id) : null,
+    orden: payload.orden ? Number(payload.orden) : null, titulo: String(payload.titulo || '').trim(), descripcion: String(payload.descripcion || '').trim(),
+    instrucciones: payload.instrucciones || null, ubicacion: payload.ubicacion || 'FinModulo', archivo_url: payload.archivo_url || null, archivo_nombre: payload.archivo_nombre || null,
+    fecha_inicio: payload.fecha_inicio || null, fecha_limite: payload.fecha_limite || null, estado: payload.estado || 'Borrador', visibilidad: payload.visibilidad || 'SoloInstructor',
+    obligatorio: Boolean(payload.obligatorio), bloquea_avance: Boolean(payload.bloquea_avance), condicion_desbloqueo: payload.condicion_desbloqueo || 'Responder',
+    minimo_estrellas: Number(payload.minimo_estrellas || 1), mensaje_bloqueo: payload.mensaje_bloqueo || null,
+  };
+  if (!clean.curso_id || !clean.titulo || !clean.descripcion) throw new AppError('Curso, titulo y caso son obligatorios', 400);
+  let current = null;
+  if (id) { current = await getForum(id); await assertCourseAccess(user, current.curso_id); }
+  await assertCourseAccess(user, clean.curso_id);
+  if (clean.modulo_id && (!id || Number(clean.modulo_id) !== Number(current.modulo_id)) && !clean.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
+  const query = id ? supabase.from('foros_evaluables').update({ ...clean, updated_at: new Date().toISOString() }).eq('id', id) : supabase.from('foros_evaluables').insert({ ...clean, creado_por: user.id });
+  const { data, error } = await query.select('*').single(); fail(error); return data;
+};
 const removeForum = async (user, id) => { const forum = await getForum(id); await assertCourseAccess(user, forum.curso_id); fail((await supabase.from('foros_evaluables').delete().eq('id', id)).error); return forum; };
-const respondForum = async (user, forumId, payload) => { const forum = await getForum(forumId); await assertCourseAccess(user, forum.curso_id); if (roleName(user) !== 'Estudiante' || forum.estado !== 'Publicado') throw new AppError('Foro no disponible', 403); const { data, error } = await supabase.from('foro_respuestas').upsert({ foro_id: forumId, usuario_id: user.id, texto: payload.texto, archivo_url: payload.archivo_url || null, archivo_nombre: payload.archivo_nombre || null, estado: 'Enviado', enviado_at: new Date().toISOString() }, { onConflict: 'foro_id,usuario_id' }).select('*').single(); fail(error); return data; };
+const reorderForum = async (user, id, direction) => { const forum = await getForum(id); await assertCourseAccess(user, forum.curso_id); return courseSequence.reorder('Foro', id, direction); };
+const respondForum = async (user, forumId, payload) => { const forum = await getForum(forumId); await assertCourseAccess(user, forum.curso_id); if (roleName(user) !== 'Estudiante' || forum.estado !== 'Publicado') throw new AppError('Foro no disponible', 403); await assertActivityUnlocked(user.id, forum.curso_id, 'Foro', forumId); const { data, error } = await supabase.from('foro_respuestas').upsert({ foro_id: forumId, usuario_id: user.id, texto: payload.texto, archivo_url: payload.archivo_url || null, archivo_nombre: payload.archivo_nombre || null, estado: 'Enviado', enviado_at: new Date().toISOString() }, { onConflict: 'foro_id,usuario_id' }).select('*').single(); fail(error); return data; };
 const forumResults = async (user, forumId) => { const forum = await getForum(forumId); await assertCourseAccess(user, forum.curso_id); const { data, error } = await supabase.from('foro_respuestas').select('*, estudiante:usuarios(id,"Nombres",usuario,"Correo")').eq('foro_id', forumId).order('enviado_at', { ascending: false }); fail(error); return { foro: forum, respuestas: data }; };
 const gradeForum = async (user, responseId, payload) => { const { data: response, error } = await supabase.from('foro_respuestas').select('*, foro:foros_evaluables(curso_id)').eq('id', responseId).maybeSingle(); fail(error); if (!response) throw new AppError('Respuesta no encontrada', 404); await assertCourseAccess(user, response.foro.curso_id); const stars = Number(payload.estrellas); if (stars < 1 || stars > 5) throw new AppError('La calificacion debe estar entre 1 y 5 estrellas', 400); const { data, error: updateError } = await supabase.from('foro_respuestas').update({ estrellas: stars, retroalimentacion: payload.retroalimentacion || null, estado: 'Calificado', calificado_por: user.id, calificado_at: new Date().toISOString() }).eq('id', responseId).select('*').single(); fail(updateError); return data; };
 
 const activitySatisfied = (activity, record) => { if (!record) return false; if (activity.tipo_actividad === 'Evaluacion') { if (activity.condicion_desbloqueo === 'Responder') return record.estado !== 'EnProgreso'; if (activity.condicion_desbloqueo === 'CalificacionManual') return !['EnProgreso','Enviado','PendienteCalificacion'].includes(record.estado); return record.estado === 'Aprobado'; } if (activity.condicion_desbloqueo === 'Responder') return true; if (activity.condicion_desbloqueo === 'Calificacion') return record.estado === 'Calificado'; return Number(record.estrellas || 0) >= Number(activity.minimo_estrellas || 1); };
-const courseActivities = async (courseId, userId, { publishedOnly = true } = {}) => { let evaluationsQuery = supabase.from('evaluaciones').select('*, preguntas:evaluacion_preguntas(count)').eq('curso_id', courseId); if (publishedOnly) evaluationsQuery = evaluationsQuery.eq('estado', 'Publicada'); const { data: evaluations, error } = await evaluationsQuery; if (missingEvaluationSchema(error)) return []; fail(error); let forumsQuery = supabase.from('foros_evaluables').select('*').eq('curso_id', courseId); if (publishedOnly) forumsQuery = forumsQuery.eq('estado', 'Publicado'); const { data: forums, error: forumError } = await forumsQuery; if (missingEvaluationSchema(forumError)) return []; fail(forumError); let attempts = []; let responses = []; if (userId && evaluations.length) { const result = await supabase.from('evaluacion_intentos').select('*').eq('usuario_id', userId).in('evaluacion_id', evaluations.map((item) => item.id)).order('numero_intento', { ascending: false }); fail(result.error); attempts = result.data; } if (userId && forums.length) { const result = await supabase.from('foro_respuestas').select('*').eq('usuario_id', userId).in('foro_id', forums.map((item) => item.id)); fail(result.error); responses = result.data; } return [...evaluations.map((item) => { const record = attempts.find((attempt) => Number(attempt.evaluacion_id) === Number(item.id)); const activity = { ...item, cantidad_preguntas: item.preguntas && item.preguntas[0] ? item.preguntas[0].count : 0, tipo_actividad: 'Evaluacion', intento: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; }), ...forums.map((item) => { const record = responses.find((response) => Number(response.foro_id) === Number(item.id)); const activity = { ...item, tipo_actividad: 'Foro', respuesta: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; })]; };
+const courseActivities = async (courseId, userId, { publishedOnly = true } = {}) => { let evaluationsQuery = supabase.from('evaluaciones').select('*, preguntas:evaluacion_preguntas(count)').eq('curso_id', courseId); if (publishedOnly) evaluationsQuery = evaluationsQuery.eq('estado', 'Publicada'); const { data: evaluations, error } = await evaluationsQuery; if (missingEvaluationSchema(error)) return []; fail(error); let forumsQuery = supabase.from('foros_evaluables').select('*, respuestas:foro_respuestas(count)').eq('curso_id', courseId); if (publishedOnly) forumsQuery = forumsQuery.eq('estado', 'Publicado'); const { data: forums, error: forumError } = await forumsQuery; if (missingEvaluationSchema(forumError)) return []; fail(forumError); let attempts = []; let responses = []; if (userId && evaluations.length) { const result = await supabase.from('evaluacion_intentos').select('*').eq('usuario_id', userId).in('evaluacion_id', evaluations.map((item) => item.id)).order('numero_intento', { ascending: false }); fail(result.error); attempts = result.data; } if (userId && forums.length) { const result = await supabase.from('foro_respuestas').select('*').eq('usuario_id', userId).in('foro_id', forums.map((item) => item.id)); fail(result.error); responses = result.data; } return [...evaluations.map((item) => { const record = attempts.find((attempt) => Number(attempt.evaluacion_id) === Number(item.id)); const activity = { ...item, cantidad_preguntas: item.preguntas && item.preguntas[0] ? item.preguntas[0].count : 0, tipo_actividad: 'Evaluacion', intento: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; }), ...forums.map((item) => { const record = responses.find((response) => Number(response.foro_id) === Number(item.id)); const activity = { ...item, obligatoria: Boolean(item.obligatorio), cantidad_respuestas: item.respuestas && item.respuestas[0] ? item.respuestas[0].count : 0, tipo_actividad: 'Foro', respuesta: record || null }; return { ...activity, completada: activitySatisfied(activity, record) }; })]; };
 
-const assertLessonUnlocked = async (userId, lessonId) => {
-  const { data: lesson, error } = await supabase.from('lecciones').select('id,orden,modulo_id,modulo:modulos(id,orden,curso_id)').eq('id', lessonId).maybeSingle();
-  fail(error); if (!lesson) throw new AppError('Leccion no encontrada', 404);
-  const { data: modules, error: moduleError } = await supabase.from('modulos').select('id,orden').eq('curso_id', lesson.modulo.curso_id).order('orden'); fail(moduleError);
-  const { data: lessons, error: lessonsError } = await supabase.from('lecciones').select('id,orden,modulo_id').in('modulo_id', modules.map((item) => item.id)).order('orden'); fail(lessonsError);
-  const activities = await courseActivities(lesson.modulo.curso_id, userId);
+const buildCourseJourney = async (courseId, userId) => {
+  const { data: modules, error: moduleError } = await supabase.from('modulos').select('id,orden').eq('curso_id', courseId).eq('estado', 'Publicado').order('orden'); fail(moduleError);
+  if (!modules.length) return [];
+  const { data: lessons, error: lessonsError } = await supabase.from('lecciones').select('id,orden,modulo_id').in('modulo_id', modules.map((item) => item.id)).eq('estado', 'Publicado').order('orden'); fail(lessonsError);
+  const activities = await courseActivities(courseId, userId);
   const journey = [];
   modules.forEach((module) => {
     const items = [
       ...lessons.filter((item) => Number(item.modulo_id) === Number(module.id)).map((item) => ({ tipo: 'Leccion', id: item.id, orden: item.orden })),
-      ...activities.filter((activity) => activity.tipo_actividad === 'Evaluacion' && Number(activity.modulo_id) === Number(module.id)).map((activity) => ({ tipo: 'Actividad', activity, orden: activity.orden })),
+      ...activities.filter((activity) => activity.orden != null && Number(activity.modulo_id) === Number(module.id)).map((activity) => ({ tipo: 'Actividad', activity, orden: activity.orden })),
     ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
     items.forEach((item) => {
       journey.push(item);
-      if (item.tipo === 'Leccion') activities.filter((activity) => activity.tipo_actividad !== 'Evaluacion' && activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(item.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
+      if (item.tipo === 'Leccion') activities.filter((activity) => !activity.modulo_id && activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(item.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
     });
-    activities.filter((activity) => activity.tipo_actividad !== 'Evaluacion' && activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
+    activities.filter((activity) => !activity.orden && activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
   });
   activities.filter((activity) => activity.ubicacion === 'FinCurso').forEach((activity) => journey.push({ tipo: 'Actividad', activity }));
-  const lessonIndex = journey.findIndex((item) => item.tipo === 'Leccion' && Number(item.id) === Number(lessonId));
-  const blocker = journey.slice(0, lessonIndex).find((item) => item.tipo === 'Actividad' && item.activity.obligatoria && item.activity.bloquea_avance && !item.activity.completada);
-  if (blocker) throw new AppError(blocker.activity.mensaje_bloqueo || 'Debes completar la actividad obligatoria anterior para continuar.', 423);
+  return journey;
+};
+
+const blockerMessage = (activity) => {
+  if (activity.tipo_actividad === 'Evaluacion' && activity.intento && activity.intento.estado === 'PendienteCalificacion') return 'Tu evaluacion esta pendiente de revision por el instructor.';
+  if (activity.tipo_actividad === 'Foro' && activity.respuesta && activity.respuesta.estado !== 'Calificado' && activity.condicion_desbloqueo !== 'Responder') return 'Tu respuesta esta pendiente de revision por el instructor.';
+  return activity.mensaje_bloqueo || (activity.tipo_actividad === 'Foro' ? 'Debes completar este foro para continuar.' : 'Debes completar esta evaluacion para continuar.');
+};
+
+const assertJourneyUnlocked = async (userId, courseId, predicate) => {
+  const journey = await buildCourseJourney(courseId, userId);
+  const targetIndex = journey.findIndex(predicate);
+  if (targetIndex < 0) throw new AppError('Contenido no encontrado en el recorrido publicado', 404);
+  const blocker = journey.slice(0, targetIndex).find((item) => item.tipo === 'Actividad' && item.activity.obligatoria && item.activity.bloquea_avance && !item.activity.completada);
+  if (blocker) throw new AppError(blockerMessage(blocker.activity), 423);
   return true;
 };
 
-module.exports = { list, listStudent, detail, create, update, remove, reorder, duplicate, startAttempt, submitAttempt, results, gradeAnswer, listForums, getForum, forumDetail, saveForum, removeForum, respondForum, forumResults, gradeForum, courseActivities, assertLessonUnlocked };
+const assertLessonUnlocked = async (userId, lessonId) => {
+  const { data: lesson, error } = await supabase.from('lecciones').select('id,modulo:modulos(curso_id)').eq('id', lessonId).maybeSingle();
+  fail(error); if (!lesson) throw new AppError('Leccion no encontrada', 404);
+  return assertJourneyUnlocked(userId, lesson.modulo.curso_id, (item) => item.tipo === 'Leccion' && Number(item.id) === Number(lessonId));
+};
+
+const assertActivityUnlocked = async (userId, courseId, activityType, activityId) => assertJourneyUnlocked(userId, courseId, (item) => item.tipo === 'Actividad' && item.activity.tipo_actividad === activityType && Number(item.activity.id) === Number(activityId));
+
+module.exports = { list, listStudent, detail, create, update, remove, reorder, duplicate, startAttempt, submitAttempt, results, gradeAnswer, listForums, getForum, forumDetail, saveForum, removeForum, reorderForum, respondForum, forumResults, gradeForum, courseActivities, assertLessonUnlocked };

@@ -3,25 +3,29 @@ const AppError = require('../utils/AppError');
 
 const fail = (error) => {
   if (!error) return;
-  if (['42703', 'PGRST204'].includes(error.code)) throw new AppError('Falta ejecutar la migracion 007_integracion_evaluaciones_modulos.sql en Supabase', 500, error.message);
+  if (['42703', 'PGRST204'].includes(error.code)) throw new AppError('Falta ejecutar las migraciones 007 y 008 de integracion de actividades en Supabase', 500, error.message);
   throw new AppError('Error al ordenar el contenido del modulo', 500, error.message);
 };
 
 const TABLES = {
   Leccion: 'lecciones',
   Evaluacion: 'evaluaciones',
+  Foro: 'foros_evaluables',
 };
 
 const listModuleItems = async (moduleId) => {
-  const [lessonsResult, evaluationsResult] = await Promise.all([
+  const [lessonsResult, evaluationsResult, forumsResult] = await Promise.all([
     supabase.from('lecciones').select('id,modulo_id,orden').eq('modulo_id', moduleId),
     supabase.from('evaluaciones').select('id,modulo_id,orden').eq('modulo_id', moduleId),
+    supabase.from('foros_evaluables').select('id,modulo_id,orden').eq('modulo_id', moduleId),
   ]);
   fail(lessonsResult.error);
   fail(evaluationsResult.error);
+  fail(forumsResult.error);
   return [
     ...lessonsResult.data.map((item) => ({ ...item, tipo: 'Leccion' })),
     ...evaluationsResult.data.map((item) => ({ ...item, tipo: 'Evaluacion' })),
+    ...forumsResult.data.map((item) => ({ ...item, tipo: 'Foro' })),
   ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0) || a.tipo.localeCompare(b.tipo) || Number(a.id) - Number(b.id));
 };
 
