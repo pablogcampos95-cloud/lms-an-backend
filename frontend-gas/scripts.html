@@ -626,7 +626,17 @@ function renderStudentQuestion(question) { if (question.tipo === 'TextoLargo') r
 async function submitEvaluationAttempt(event) { event.preventDefault(); const answers = Array.from(document.querySelectorAll('.take-question')).map((card) => { const type = card.dataset.questionType; const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value)); return { pregunta_id: Number(card.dataset.questionId), opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null, opciones_ids: type === 'OpcionMultiple' ? checked : null, respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null }; }); try { const result = await EvaluacionesService.enviar(AppState.currentAttempt.evaluacion.id,AppState.currentAttempt.intento.id,answers); AppState.takeEvaluationModal.hide(); await loadEvaluations(); Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : result.estado === 'PendienteCalificacion' ? 'Enviada para revision' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info'); } catch(error){ Swal.fire('No se pudo enviar',error.message,'error'); } }
 function viewEvaluationResult(id) { const item = AppState.evaluaciones.find((evaluation) => evaluation.id === id); const attempt = item && item.ultimo_intento; Swal.fire({ icon: attempt && attempt.estado === 'Aprobado' ? 'success' : 'info', title: item ? item.titulo : 'Resultado', html: attempt ? `<p>Estado: <strong>${escapeHtml(attempt.estado)}</strong></p><div class="display-4">${Number(attempt.porcentaje || 0)}%</div>` : 'Sin resultado disponible' }); }
 
-function renderForums() { const items = AppState.foros; document.getElementById('evaluationPageTitle').textContent = isStudent() ? 'Mis foros' : 'Foros evaluables'; document.getElementById('evaluationMetrics').innerHTML = `<div><span>Foros</span><strong>${items.length}</strong></div><div><span>Publicados</span><strong>${items.filter((item)=>item.estado==='Publicado').length}</strong></div>`; const container=document.getElementById('evaluationsContent'); container.className=items.length?'evaluation-admin-list':'empty-state'; container.innerHTML=items.length?items.map((item)=>`<article class="evaluation-admin-card"><div class="evaluation-card-icon"><i class="fa-solid fa-comments"></i></div><div class="evaluation-card-main"><div class="d-flex gap-2"><span class="badge ${item.estado==='Publicado'?'text-bg-success':'badge-soft'}">${item.estado}</span>${item.obligatorio?'<span class="badge text-bg-warning">Obligatorio</span>':''}</div><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.curso.nombre)}</p><div class="evaluation-card-stats"><span>${item.respuestas&&item.respuestas[0]?item.respuestas[0].count:0} respuestas</span><span>${item.condicion_desbloqueo}</span></div></div><div class="evaluation-card-actions">${isStudent()?`<button class="btn btn-gold" onclick="openForumResponse(${item.id})">Responder foro</button>`:`<button class="btn btn-outline-light btn-sm" onclick="openForumModal(${item.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-outline-info btn-sm" onclick="showForumResults(${item.id})"><i class="fa-solid fa-star"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteForum(${item.id})"><i class="fa-solid fa-trash"></i></button>`}</div></article>`).join(''):'<i class="fa-solid fa-comments fa-2x mb-3"></i><strong>No hay foros disponibles</strong>'; }
+function renderForums() {
+  const items = AppState.foros;
+  document.getElementById('evaluationPageTitle').textContent = isStudent() ? 'Mis foros' : 'Foros evaluables';
+  document.getElementById('evaluationMetrics').innerHTML = `<div><span>Foros</span><strong>${items.length}</strong></div><div><span>Publicados</span><strong>${items.filter((item)=>item.estado==='Publicado').length}</strong></div>`;
+  const workspace = document.getElementById('forumWorkspace');
+  workspace.classList.add('d-none');
+  workspace.innerHTML = '';
+  const container = document.getElementById('evaluationsContent');
+  container.className = items.length ? 'evaluation-admin-list' : 'empty-state';
+  container.innerHTML = items.length ? items.map((item) => `<article class="evaluation-admin-card"><div class="evaluation-card-icon"><i class="fa-solid fa-comments"></i></div><div class="evaluation-card-main"><div class="d-flex gap-2"><span class="badge ${item.estado==='Publicado'?'text-bg-success':'badge-soft'}">${item.estado}</span>${item.obligatorio?'<span class="badge text-bg-warning">Obligatorio</span>':''}</div><h3>${escapeHtml(item.titulo)}</h3><p>${escapeHtml(item.curso.nombre)}</p><div class="evaluation-card-stats"><span>${item.respuestas&&item.respuestas[0]?item.respuestas[0].count:0} respuestas</span><span>${item.condicion_desbloqueo}</span></div></div><div class="evaluation-card-actions"><button class="btn btn-outline-info" onclick="loadForumWorkspace(${item.id},'forumWorkspace')"><i class="fa-solid fa-comments me-2"></i>${isStudent()?'Participar':'Revisar y calificar'}</button>${isStudent()?'':`<button class="btn btn-outline-light btn-sm" onclick="openForumModal(${item.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteForum(${item.id})"><i class="fa-solid fa-trash"></i></button>`}</div></article>`).join('') : '<i class="fa-solid fa-comments fa-2x mb-3"></i><strong>No hay foros disponibles</strong>';
+}
 async function openForumModal(id=null, context=null) {
   document.getElementById('forumForm').reset(); document.getElementById('forumId').value=id||''; document.getElementById('forumModuleId').value=context?context.moduleId:''; AppState.forumContext=context; populateEvaluationCourseSelectors();
   let item=null;
@@ -637,10 +647,76 @@ async function openForumModal(id=null, context=null) {
 }
 async function saveForum(event) { event.preventDefault(); const id=document.getElementById('forumId').value; const context=AppState.forumContext; const payload={titulo:document.getElementById('forumTitle').value.trim(),curso_id:Number(document.getElementById('forumCourse').value),modulo_id:document.getElementById('forumModuleId').value||null,descripcion:document.getElementById('forumDescription').value.trim(),instrucciones:document.getElementById('forumInstructions').value.trim(),estado:document.getElementById('forumStatus').value,ubicacion:document.getElementById('forumModuleId').value?'FinModulo':'FinCurso',archivo_url:document.getElementById('forumFileUrl').value.trim()||null,archivo_nombre:document.getElementById('forumFileName').value.trim()||null,obligatorio:document.getElementById('forumRequired').checked,bloquea_avance:document.getElementById('forumBlocks').checked,condicion_desbloqueo:document.getElementById('forumUnlock').value,minimo_estrellas:Number(document.getElementById('forumStars').value||1),mensaje_bloqueo:document.getElementById('forumBlockMessage').value.trim()||null}; try{const saved=id?await EvaluacionesService.actualizarForo(id,payload):await EvaluacionesService.crearForo(payload);const file=document.getElementById('forumFile').files[0];if(file)await EvaluacionesService.subirArchivoForo(saved.id,file);AppState.forumModal.hide();if(context)await openCourseEditor(context.courseId);else await loadEvaluations();toastSuccess('Foro guardado');}catch(error){Swal.fire('No se pudo guardar',error.message,'error');} }
 async function deleteForum(id){if(!(await confirmAction('Eliminar foro','Se eliminaran sus respuestas y calificaciones.')))return;try{await EvaluacionesService.eliminarForo(id);await loadEvaluations();}catch(error){Swal.fire('No se pudo eliminar',error.message,'error');}}
-function openForumResponse(id) { const forum=AppState.foros.find((item)=>item.id===id); if(!forum)return; document.getElementById('forumResponseId').value=id;document.getElementById('forumResponseTitle').textContent=forum.titulo;document.getElementById('forumResponseCase').innerHTML=`<p>${escapeHtml(forum.descripcion)}</p>${forum.archivo_url?`<a class="btn btn-outline-info btn-sm" href="${escapeHtml(forum.archivo_url)}" target="_blank">${escapeHtml(forum.archivo_nombre||'Ver documento')}</a>`:''}`;AppState.forumResponseModal.show(); }
-async function submitForumResponse(event){event.preventDefault();try{await EvaluacionesService.responderForo(document.getElementById('forumResponseId').value,{texto:document.getElementById('forumResponseText').value.trim()});AppState.forumResponseModal.hide();await loadEvaluations();toastSuccess('Respuesta enviada');}catch(error){Swal.fire('No se pudo enviar',error.message,'error');}}
-async function showForumResults(id){try{const data=await EvaluacionesService.resultadosForo(id);Swal.fire({title:data.foro.titulo,width:900,html:data.respuestas.length?`<div class="forum-review-list">${data.respuestas.map((response)=>`<article><strong>${escapeHtml(response.estudiante.Nombres||response.estudiante.usuario)}</strong><p>${escapeHtml(response.texto)}</p><div class="forum-grade-controls"><input id="forum-stars-${response.id}" class="form-control" type="number" min="1" max="5" value="${response.estrellas||3}"><input id="forum-feedback-${response.id}" class="form-control" placeholder="Retroalimentacion" value="${escapeHtml(response.retroalimentacion||'')}"><button class="btn btn-sm btn-gold" onclick="gradeForumResponse(${response.id})">Guardar</button></div></article>`).join('')}</div>`:'<div class="empty-state">Sin respuestas</div>',showConfirmButton:false,showCloseButton:true});}catch(error){Swal.fire('No se pudieron cargar respuestas',error.message,'error');}}
-async function gradeForumResponse(id){try{await EvaluacionesService.calificarForo(id,{estrellas:Number(document.getElementById(`forum-stars-${id}`).value),retroalimentacion:document.getElementById(`forum-feedback-${id}`).value});toastSuccess('Foro calificado');Swal.close();}catch(error){Swal.fire('No se pudo calificar',error.message,'error');}}
+function forumStars(value = 0) {
+  return Array.from({ length: 5 }, (_, index) => `<i class="fa-${index < Number(value || 0) ? 'solid' : 'regular'} fa-star"></i>`).join('');
+}
+
+function forumStarPicker(response) {
+  return `<div class="forum-star-picker" aria-label="Calificacion por estrellas">${[5,4,3,2,1].map((value) => `<input id="forum-star-${response.id}-${value}" type="radio" name="forum-stars-${response.id}" value="${value}" ${Number(response.estrellas || 0) === value ? 'checked' : ''}><label for="forum-star-${response.id}-${value}" title="${value} estrellas"><i class="fa-solid fa-star"></i></label>`).join('')}</div>`;
+}
+
+function renderForumWorkspace(data, targetId) {
+  const target = document.getElementById(targetId);
+  const own = data.respuestas.find((response) => response.es_mia) || null;
+  const canGrade = Boolean(data.puede_calificar);
+  const comments = data.respuestas.length ? data.respuestas.map((response) => `
+    <article class="forum-comment ${response.es_mia ? 'mine' : ''}">
+      <div class="forum-comment-head"><div><strong>${escapeHtml(response.estudiante.Nombres || response.estudiante.usuario)}</strong>${response.es_mia ? '<span class="badge badge-soft ms-2">Tu respuesta</span>' : ''}</div><small>${response.enviado_at ? formatDate(response.enviado_at) : ''}</small></div>
+      <p>${escapeHtml(response.texto)}</p>
+      ${response.es_mia && response.estrellas ? `<div class="forum-my-grade"><div class="forum-stars text-warning">${forumStars(response.estrellas)}</div><div><strong>Calificacion: ${response.estrellas}/5</strong><p class="mb-0">${escapeHtml(response.retroalimentacion || 'Sin feedback escrito.')}</p></div></div>` : ''}
+      ${canGrade ? `<div class="forum-admin-grade"><strong>Evaluar respuesta</strong><div class="forum-grade-fields"><div>${forumStarPicker(response)}</div><textarea id="forum-feedback-${response.id}" class="form-control" placeholder="Escribe el feedback para el estudiante">${escapeHtml(response.retroalimentacion || '')}</textarea><button class="btn btn-gold" type="button" onclick="gradeForumResponse(${response.id},${data.foro.id},'${targetId}')"><i class="fa-solid fa-check me-2"></i>Guardar evaluacion</button></div></div>` : ''}
+    </article>`).join('') : '<div class="empty-state">Todavia no hay participaciones. Se el primero en responder.</div>';
+  target.classList.remove('d-none');
+  target.innerHTML = `
+    <div class="forum-workspace-header"><div><span class="eyebrow">FORO EVALUABLE</span><h2>${escapeHtml(data.foro.titulo)}</h2><p>${escapeHtml(data.foro.descripcion)}</p></div>${targetId === 'forumWorkspace' ? '<button class="btn btn-outline-light btn-sm" onclick="document.getElementById(\'forumWorkspace\').classList.add(\'d-none\')"><i class="fa-solid fa-xmark"></i></button>' : ''}</div>
+    ${data.foro.instrucciones ? `<div class="forum-instructions"><strong>Instrucciones</strong><span>${escapeHtml(data.foro.instrucciones)}</span></div>` : ''}
+    ${data.foro.archivo_url ? `<a class="btn btn-outline-info btn-sm mt-3" href="${escapeHtml(data.foro.archivo_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip me-2"></i>${escapeHtml(data.foro.archivo_nombre || 'Ver recurso')}</a>` : ''}
+    ${isStudent() ? `<div class="forum-response-editor"><label class="form-label fw-bold" for="forum-inline-response-${data.foro.id}">${own ? 'Actualiza tu respuesta' : 'Escribe tu participación'}</label><textarea id="forum-inline-response-${data.foro.id}" class="form-control" placeholder="Comparte tu análisis y aporta a la conversación">${escapeHtml(own ? own.texto : '')}</textarea><div class="d-flex justify-content-end mt-3"><button class="btn btn-gold" type="button" onclick="submitInlineForumResponse(${data.foro.id},'${targetId}')"><i class="fa-solid fa-paper-plane me-2"></i>${own ? 'Actualizar respuesta' : 'Publicar respuesta'}</button></div></div>` : ''}
+    <div class="d-flex align-items-center justify-content-between mt-4"><h3 class="h5 mb-0">Conversacion del curso</h3><span class="badge badge-soft">${data.respuestas.length} participaciones</span></div>
+    <div class="forum-conversation">${comments}</div>`;
+  if (targetId === 'forumWorkspace') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadForumWorkspace(id, targetId = 'forumWorkspace') {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.classList.remove('d-none');
+  target.innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando conversacion...</div>';
+  try {
+    renderForumWorkspace(await EvaluacionesService.resultadosForo(id), targetId);
+  } catch (error) {
+    target.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function submitInlineForumResponse(id, targetId) {
+  const input = document.getElementById(`forum-inline-response-${id}`);
+  const texto = input ? input.value.trim() : '';
+  if (!texto) { Swal.fire('Respuesta requerida', 'Escribe tu participacion antes de publicarla.', 'warning'); return; }
+  try {
+    await EvaluacionesService.responderForo(id, { texto });
+    await loadForumWorkspace(id, targetId);
+    if (AppState.cursoActual && targetId.startsWith('integratedForum-')) {
+      AppState.cursoActual = await CursosService.aprender(AppState.cursoActual.id);
+      AppState.studentLessons = buildStudentJourney(AppState.cursoActual);
+    }
+    toastSuccess('Respuesta publicada');
+  } catch (error) { Swal.fire('No se pudo publicar', error.message, 'error'); }
+}
+
+async function gradeForumResponse(id, forumId, targetId) {
+  const selected = document.querySelector(`input[name="forum-stars-${id}"]:checked`);
+  if (!selected) { Swal.fire('Selecciona una calificacion', 'Marca entre una y cinco estrellas.', 'warning'); return; }
+  try {
+    await EvaluacionesService.calificarForo(id, { estrellas: Number(selected.value), retroalimentacion: document.getElementById(`forum-feedback-${id}`).value.trim() });
+    await loadForumWorkspace(forumId, targetId);
+    toastSuccess('Respuesta evaluada');
+  } catch (error) { Swal.fire('No se pudo calificar', error.message, 'error'); }
+}
+
+function openForumResponse(id) { loadForumWorkspace(id, 'forumWorkspace'); }
+async function submitForumResponse(event) { event.preventDefault(); }
+function showForumResults(id) { loadForumWorkspace(id, 'forumWorkspace'); }
 
 async function loadStudentCertificates() {
   const container = document.getElementById('certificatesContent');
@@ -1202,15 +1278,18 @@ function renderStudentCoursePlayer() {
         <aside class="student-player-sidebar"><div class="student-player-sidebar-title">Contenido del curso</div>${renderStudentJourneyOutline()}</aside>
         <main class="student-player-content">
           ${activityContent}
-          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid ${leccion.tipo_actividad === 'Foro' ? 'fa-comments' : 'fa-list-check'} me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Foro' ? '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
         </main>
       </div>
     </div>`;
+  if (leccion.es_actividad && leccion.tipo_actividad === 'Foro' && !AppState.previewMode) {
+    setTimeout(() => loadForumWorkspace(leccion.id, `integratedForum-${leccion.id}`), 0);
+  }
 }
 
 function journeyActivityState(activity) { const record=activity.tipo_actividad==='Foro'?activity.respuesta:activity.intento;if(activity.completada)return{label:activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Aprobado'?'Aprobada':'Completado',className:'text-success',icon:'fa-circle-check',message:''};if(record&&((activity.tipo_actividad==='Evaluacion'&&record.estado==='PendienteCalificacion')||(activity.tipo_actividad==='Foro'&&record.estado!=='Calificado'&&activity.condicion_desbloqueo!=='Responder')))return{label:'Pendiente de calificacion',className:'text-warning',icon:'fa-clock',message:activity.tipo_actividad==='Foro'?'Tu respuesta esta pendiente de revision por el instructor.':'Tu evaluacion esta pendiente de revision por el instructor.'};if(activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Desaprobado')return{label:'Desaprobada',className:'text-danger',icon:'fa-circle-xmark',message:activity.bloquea_avance?'Debes aprobar esta evaluacion para continuar.':''};return{label:activity.bloqueado?'Bloqueado':'Disponible',className:activity.bloqueado?'text-warning':'text-info',icon:activity.bloqueado?'fa-lock':'fa-circle-play',message:activity.bloquea_avance?(activity.mensaje_bloqueo||(activity.tipo_actividad==='Foro'?'Debes completar este foro para continuar.':'Debes completar esta evaluacion para continuar.')):''}; }
-function renderJourneyActivity(activity) { const state=journeyActivityState(activity);return `<div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid ${activity.tipo_actividad === 'Foro' ? 'fa-comments' : 'fa-clipboard-check'}"></i></div><div><span class="eyebrow">${activity.tipo_actividad === 'Foro' ? 'FORO EVALUABLE' : 'EVALUACION'}${activity.obligatoria||activity.obligatorio ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p><span class="${state.className}"><i class="fa-solid ${state.icon} me-2"></i>${state.label}</span>${state.message?`<p class="mt-2 mb-0 ${state.className}">${escapeHtml(state.message)}</p>`:''}</div></div>`; }
-function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; AppState.coursePreviewModal.hide(); if (activity.tipo_actividad === 'Foro') { AppState.foros = [activity]; openForumResponse(activity.id); } else takeEvaluation(activity.id); }
+function renderJourneyActivity(activity) { const state=journeyActivityState(activity);if(activity.tipo_actividad==='Foro')return `<div id="integratedForum-${activity.id}" class="integrated-forum"><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando foro...</div></div>`;return `<div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div><div><span class="eyebrow">EVALUACION${activity.obligatoria ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p><span class="${state.className}"><i class="fa-solid ${state.icon} me-2"></i>${state.label}</span>${state.message?`<p class="mt-2 mb-0 ${state.className}">${escapeHtml(state.message)}</p>`:''}</div></div>`; }
+function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; if (activity.tipo_actividad === 'Foro') { loadForumWorkspace(activity.id, `integratedForum-${activity.id}`); } else takeEvaluation(activity.id); }
 
 function renderStudentCourseOutline() {
   let lastModule = '';

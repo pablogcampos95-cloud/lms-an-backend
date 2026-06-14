@@ -253,7 +253,24 @@ const saveForum = async (user, payload, id = null) => {
 const removeForum = async (user, id) => { const forum = await getForum(id); await assertCourseAccess(user, forum.curso_id); fail((await supabase.from('foros_evaluables').delete().eq('id', id)).error); return forum; };
 const reorderForum = async (user, id, direction) => { const forum = await getForum(id); await assertCourseAccess(user, forum.curso_id); return courseSequence.reorder('Foro', id, direction); };
 const respondForum = async (user, forumId, payload) => { const forum = await getForum(forumId); await assertCourseAccess(user, forum.curso_id); if (roleName(user) !== 'Estudiante' || forum.estado !== 'Publicado') throw new AppError('Foro no disponible', 403); await assertActivityUnlocked(user.id, forum.curso_id, 'Foro', forumId); const { data, error } = await supabase.from('foro_respuestas').upsert({ foro_id: forumId, usuario_id: user.id, texto: payload.texto, archivo_url: payload.archivo_url || null, archivo_nombre: payload.archivo_nombre || null, estado: 'Enviado', enviado_at: new Date().toISOString() }, { onConflict: 'foro_id,usuario_id' }).select('*').single(); fail(error); return data; };
-const forumResults = async (user, forumId) => { const forum = await getForum(forumId); await assertCourseAccess(user, forum.curso_id); const { data, error } = await supabase.from('foro_respuestas').select('*, estudiante:usuarios(id,"Nombres",usuario,"Correo")').eq('foro_id', forumId).order('enviado_at', { ascending: false }); fail(error); return { foro: forum, respuestas: data }; };
+const forumResults = async (user, forumId) => {
+  const forum = await getForum(forumId);
+  await assertCourseAccess(user, forum.curso_id);
+  const { data, error } = await supabase
+    .from('foro_respuestas')
+    .select('*, estudiante:usuarios!foro_respuestas_usuario_id_fkey(id,"Nombres",usuario,"Correo"), evaluador:usuarios!foro_respuestas_calificado_por_fkey(id,"Nombres",usuario)')
+    .eq('foro_id', forumId)
+    .order('enviado_at', { ascending: true });
+  fail(error);
+  const student = roleName(user) === 'Estudiante';
+  const responses = data.map((response) => {
+    const own = Number(response.usuario_id) === Number(user.id);
+    if (!student || own) return { ...response, es_mia: own };
+    const { estrellas, retroalimentacion, calificado_por, calificado_at, evaluador, ...publicResponse } = response;
+    return { ...publicResponse, es_mia: false };
+  });
+  return { foro: forum, respuestas: responses, puede_calificar: isManager(user) };
+};
 const gradeForum = async (user, responseId, payload) => { const { data: response, error } = await supabase.from('foro_respuestas').select('*, foro:foros_evaluables(curso_id)').eq('id', responseId).maybeSingle(); fail(error); if (!response) throw new AppError('Respuesta no encontrada', 404); await assertCourseAccess(user, response.foro.curso_id); const stars = Number(payload.estrellas); if (stars < 1 || stars > 5) throw new AppError('La calificacion debe estar entre 1 y 5 estrellas', 400); const { data, error: updateError } = await supabase.from('foro_respuestas').update({ estrellas: stars, retroalimentacion: payload.retroalimentacion || null, estado: 'Calificado', calificado_por: user.id, calificado_at: new Date().toISOString() }).eq('id', responseId).select('*').single(); fail(updateError); return data; };
 
 const activitySatisfied = (activity, record) => { if (!record) return false; if (activity.tipo_actividad === 'Evaluacion') { if (activity.condicion_desbloqueo === 'Responder') return record.estado !== 'EnProgreso'; if (activity.condicion_desbloqueo === 'CalificacionManual') return !['EnProgreso','Enviado','PendienteCalificacion'].includes(record.estado); return record.estado === 'Aprobado'; } if (activity.condicion_desbloqueo === 'Responder') return true; if (activity.condicion_desbloqueo === 'Calificacion') return record.estado === 'Calificado'; return Number(record.estrellas || 0) >= Number(activity.minimo_estrellas || 1); };
