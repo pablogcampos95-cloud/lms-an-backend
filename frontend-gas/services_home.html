@@ -1,0 +1,16 @@
+<script>
+const HomePageService = {
+  async publica() {
+    return (await ApiService.request('/api/home-page')).data;
+  },
+  async admin() {
+    return (await ApiService.request('/api/home-page/admin')).data;
+  },
+  async guardar(config, publish = false) {
+    return (await ApiService.request('/api/home-page/admin', { method: 'PUT', body: JSON.stringify({ config, publish }) })).data;
+  },
+  async restaurar(publish = false) {
+    return (await ApiService.request('/api/home-page/admin/defaults', { method: 'POST', body: JSON.stringify({ publish }) })).data;
+  },
+};
+</script>

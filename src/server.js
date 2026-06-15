@@ -13,6 +13,7 @@ const leccionesRoutes = require('./routes/lecciones.routes');
 const evaluacionesRoutes = require('./routes/evaluaciones.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const estudianteRoutes = require('./routes/estudiante.routes');
+const homePageRoutes = require('./routes/home-page.routes');
 const { notFoundHandler, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -46,6 +47,7 @@ app.get('/api/version', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/home-page', homePageRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/cursos', cursosRoutes);

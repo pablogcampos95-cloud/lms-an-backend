@@ -27,6 +27,8 @@ const AppState = {
   currentAttempt: null,
   evaluationHasAttempts: false,
   publicCourses: [],
+  publicHomeConfig: null,
+  homeAdminConfig: null,
 };
 
 const loginContent = Object.freeze({
@@ -48,6 +50,7 @@ const MENUS = {
     ['dashboard', 'fa-chart-line', 'Dashboard'],
     ['usuarios', 'fa-users', 'Usuarios'],
     ['cursos', 'fa-sitemap', 'Administracion LMS'],
+    ['home-config', 'fa-house-chimney-window', 'Editar pagina inicial'],
     ['evaluaciones', 'fa-clipboard-check', 'Evaluaciones'],
     ['certificados', 'fa-award', 'Certificados'],
     ['reportes', 'fa-file-lines', 'Reportes'],
@@ -132,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('forumResponseForm').addEventListener('submit', submitForumResponse);
   document.getElementById('studentCourseSearch').addEventListener('input', renderStudentCoursesCatalog);
   document.getElementById('studentCourseProgressFilter').addEventListener('change', renderStudentCoursesCatalog);
+  document.getElementById('homeFeaturedMode').addEventListener('change', renderHomeAdminPreview);
+  document.getElementById('homeFeaturedLimit').addEventListener('input', renderHomeAdminPreview);
+  document.getElementById('homeVisibleCategories').addEventListener('input', renderHomeAdminPreview);
   window.addEventListener('auth:expired', handleExpiredSession);
 
   boot();
@@ -256,24 +262,117 @@ function handleLogout() {
 
 async function loadPublicCatalog() {
   const grid = document.getElementById('publicCoursesGrid');
-  if (AppState.publicCourses.length) {
+  if (AppState.publicHomeConfig) {
     renderPublicCatalog();
     return;
   }
   grid.innerHTML = '<div class="public-loading"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catalogo...</div>';
   try {
-    AppState.publicCourses = await CursosService.catalogoPublico();
+    const payload = await HomePageService.publica();
+    AppState.publicHomeConfig = payload.config;
+    AppState.publicCourses = payload.featuredCoursesData || [];
+    renderPublicHomeConfig();
     renderPublicCategoryFilter();
     renderPublicCatalog();
   } catch (error) {
-    grid.innerHTML = `<div class="public-empty"><i class="fa-solid fa-circle-exclamation"></i><strong>No se pudo cargar el catalogo</strong><span>${escapeHtml(error.message)}</span></div>`;
+    try {
+      AppState.publicCourses = await CursosService.catalogoPublico();
+      AppState.publicHomeConfig = getFallbackHomeConfig();
+      renderPublicHomeConfig();
+      renderPublicCategoryFilter();
+      renderPublicCatalog();
+    } catch (fallbackError) {
+      grid.innerHTML = `<div class="public-empty"><i class="fa-solid fa-circle-exclamation"></i><strong>No se pudo cargar el catalogo</strong><span>${escapeHtml(error.message)}</span></div>`;
+    }
   }
+}
+
+function getFallbackHomeConfig() {
+  return {
+    heroTopLabel: 'FORMACION CORPORATIVA BPO & CONTACT CENTER',
+    heroTitle: 'Desarrolla habilidades que elevan el desempeno en operaciones BPO y Contact Center.',
+    heroDescription: 'Accede a cursos disenados para fortalecer la gestion, la productividad, la calidad, la atencion al cliente y los resultados comerciales de tus equipos.',
+    heroPrimaryButtonText: 'Explorar cursos',
+    heroPrimaryButtonUrl: '#publicCourses',
+    heroSecondaryButtonText: 'Ingresar al LMS',
+    heroSecondaryButtonUrl: '#login',
+    heroAccentColor: '#00d8ff',
+    showHero: true,
+    showPrimaryButton: true,
+    showSecondaryButton: true,
+    showSideCard: true,
+    sideCardTitle: 'Aprende. Gestiona. Mejora.',
+    sideCardDescription: 'Formacion corporativa enfocada en desempeno operativo, calidad y experiencia del cliente.',
+    sideCardIcon: 'fa-brain',
+    featuredCoursesEnabled: true,
+    featuredCoursesLimit: 6,
+    featuredCoursesMode: 'manual',
+    featuredCourses: [],
+    visibleCategories: ['Atencion al cliente','Ventas consultivas','Calidad y monitoreo','Productividad operativa','Gestion de llamadas','Back Office','Supervision','Herramientas digitales','IA aplicada al Contact Center','Experiencia del cliente'],
+    homeSections: [
+      { id:'hero', type:'hero', title:'Portada principal', order:1, visible:true },
+      { id:'categories', type:'categories', title:'Categorias de formacion', description:'Explora rutas por necesidad operativa.', order:2, visible:true },
+      { id:'featuredCourses', type:'featuredCourses', title:'Cursos destacados', description:'Programas seleccionados para equipos BPO y Contact Center.', order:3, visible:true },
+      { id:'benefits', type:'benefits', title:'Beneficios de la plataforma', order:4, visible:true },
+    ],
+  };
+}
+
+function renderPublicHomeConfig() {
+  const config = AppState.publicHomeConfig || getFallbackHomeConfig();
+  const hero = document.getElementById('publicHero');
+  hero.classList.toggle('d-none', config.showHero === false);
+  hero.style.setProperty('--public-accent', config.heroAccentColor || '#00d8ff');
+  hero.style.backgroundImage = config.heroBackground
+    ? `linear-gradient(135deg,rgba(8,30,65,.88),rgba(2,11,30,.92)), url("${String(config.heroBackground).replace(/["\\\n\r]/g, '')}")`
+    : '';
+  document.getElementById('publicHeroTopLabel').textContent = config.heroTopLabel || '';
+  document.getElementById('publicHeroTitle').textContent = config.heroTitle || '';
+  document.getElementById('publicHeroDescription').textContent = config.heroDescription || '';
+  document.getElementById('publicHeroActions').innerHTML = [
+    config.showPrimaryButton !== false ? `<button class="btn btn-gold btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroPrimaryButtonUrl || '#publicCourses')}')"><i class="fa-solid fa-book-open me-2"></i>${escapeHtml(config.heroPrimaryButtonText || 'Explorar cursos')}</button>` : '',
+    config.showSecondaryButton !== false ? `<button class="btn btn-outline-light btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroSecondaryButtonUrl || '#login')}')"><i class="fa-solid fa-right-to-bracket me-2"></i>${escapeHtml(config.heroSecondaryButtonText || 'Ingresar al LMS')}</button>` : '',
+  ].join('');
+  const sideCard = document.getElementById('publicHeroCard');
+  sideCard.classList.toggle('d-none', config.showSideCard === false);
+  if (config.sideCardBackground) sideCard.style.background = config.sideCardBackground;
+  document.getElementById('publicHeroCardTitle').textContent = config.sideCardTitle || '';
+  document.getElementById('publicHeroCardDescription').textContent = config.sideCardDescription || '';
+  document.getElementById('publicHeroCardIcon').innerHTML = config.sideCardImage
+    ? `<img src="${escapeHtml(config.sideCardImage)}" alt="">`
+    : `<i class="fa-solid ${escapeHtml(config.sideCardIcon || 'fa-brain')}"></i>`;
+
+  renderPublicDynamicSections(config);
+}
+
+function handlePublicAction(url) {
+  if (!url || url === '#login') return showLogin();
+  if (url.startsWith('#')) {
+    const target = document.querySelector(url);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
+
+function renderPublicDynamicSections(config) {
+  const sections = [...(config.homeSections || [])].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const categoriesSection = sections.find((section) => section.type === 'categories');
+  const benefitsSection = sections.find((section) => section.type === 'benefits');
+  const coursesSection = sections.find((section) => section.type === 'featuredCourses');
+  document.getElementById('publicCategories').classList.toggle('d-none', !categoriesSection || categoriesSection.visible === false);
+  document.getElementById('publicCategories').innerHTML = (config.visibleCategories || []).slice(0, 9).map((category) => `<article><i class="fa-solid fa-layer-group"></i><strong>${escapeHtml(category)}</strong><span>Ruta disponible en el catalogo.</span></article>`).join('');
+  document.getElementById('publicBenefits').classList.toggle('d-none', !benefitsSection || benefitsSection.visible === false);
+  document.getElementById('publicCourses').classList.toggle('d-none', !coursesSection || coursesSection.visible === false || config.featuredCoursesEnabled === false);
+  document.getElementById('publicCoursesTitle').textContent = coursesSection && coursesSection.title ? coursesSection.title : 'Catalogo de cursos';
+  document.getElementById('publicCoursesDescription').textContent = coursesSection && coursesSection.description ? coursesSection.description : '';
 }
 
 function renderPublicCategoryFilter() {
   const select = document.getElementById('publicCategoryFilter');
   const current = select.value;
-  const categories = [...new Set(AppState.publicCourses.map((course) => course.categoria).filter(Boolean))].sort();
+  const configured = (AppState.publicHomeConfig && AppState.publicHomeConfig.visibleCategories) || [];
+  const categories = [...new Set([...configured, ...AppState.publicCourses.map((course) => course.categoria).filter(Boolean)])].sort();
   select.innerHTML = '<option value="">Todas las categorias</option>' + categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join('');
   select.value = categories.includes(current) ? current : '';
 }
@@ -323,6 +422,208 @@ function promptPublicLogin(courseId) {
   });
 }
 
+async function loadHomeAdminConfig() {
+  if (!(AppState.usuario && AppState.usuario.rol && AppState.usuario.rol.nombre === 'Administrador')) return;
+  const preview = document.getElementById('homeAdminPreview');
+  preview.innerHTML = '<div class="skeleton"></div>';
+  try {
+    const [homeData] = await Promise.all([
+      HomePageService.admin(),
+      AppState.cursos.length ? Promise.resolve() : loadCourses(),
+    ]);
+    AppState.homeAdminConfig = homeData.config || getFallbackHomeConfig();
+    fillHomeConfigForm(AppState.homeAdminConfig);
+    renderHomeFeaturedCourses();
+    renderHomeSectionsEditor();
+    renderHomeAdminPreview();
+  } catch (error) {
+    preview.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function fillHomeConfigForm(config) {
+  document.getElementById('homeHeroTopLabel').value = config.heroTopLabel || '';
+  document.getElementById('homeHeroTitle').value = config.heroTitle || '';
+  document.getElementById('homeHeroDescription').value = config.heroDescription || '';
+  document.getElementById('homeHeroAccentColor').value = config.heroAccentColor || '#00d8ff';
+  document.getElementById('homeHeroImage').value = config.heroImage || '';
+  document.getElementById('homeHeroBackground').value = config.heroBackground || '';
+  document.getElementById('homePrimaryText').value = config.heroPrimaryButtonText || '';
+  document.getElementById('homePrimaryUrl').value = config.heroPrimaryButtonUrl || '#publicCourses';
+  document.getElementById('homeSecondaryText').value = config.heroSecondaryButtonText || '';
+  document.getElementById('homeSecondaryUrl').value = config.heroSecondaryButtonUrl || '#login';
+  document.getElementById('homeShowHero').checked = config.showHero !== false;
+  document.getElementById('homeShowPrimaryButton').checked = config.showPrimaryButton !== false;
+  document.getElementById('homeShowSecondaryButton').checked = config.showSecondaryButton !== false;
+  document.getElementById('homeShowSideCard').checked = config.showSideCard !== false;
+  document.getElementById('homeSideCardTitle').value = config.sideCardTitle || '';
+  document.getElementById('homeSideCardDescription').value = config.sideCardDescription || '';
+  document.getElementById('homeSideCardIcon').value = config.sideCardIcon || 'fa-brain';
+  document.getElementById('homeSideCardImage').value = config.sideCardImage || '';
+  document.getElementById('homeSideCardBackground').value = config.sideCardBackground || '#071426';
+  document.getElementById('homeFeaturedMode').value = config.featuredCoursesMode || 'manual';
+  document.getElementById('homeFeaturedLimit').value = config.featuredCoursesLimit || 6;
+  document.getElementById('homeFeaturedEnabled').checked = config.featuredCoursesEnabled !== false;
+  document.getElementById('homeVisibleCategories').value = (config.visibleCategories || []).join('\n');
+}
+
+function collectHomeConfigForm() {
+  const base = AppState.homeAdminConfig || getFallbackHomeConfig();
+  return {
+    ...base,
+    heroTopLabel: document.getElementById('homeHeroTopLabel').value,
+    heroTitle: document.getElementById('homeHeroTitle').value,
+    heroDescription: document.getElementById('homeHeroDescription').value,
+    heroAccentColor: document.getElementById('homeHeroAccentColor').value,
+    heroImage: document.getElementById('homeHeroImage').value,
+    heroBackground: document.getElementById('homeHeroBackground').value,
+    heroPrimaryButtonText: document.getElementById('homePrimaryText').value,
+    heroPrimaryButtonUrl: document.getElementById('homePrimaryUrl').value,
+    heroSecondaryButtonText: document.getElementById('homeSecondaryText').value,
+    heroSecondaryButtonUrl: document.getElementById('homeSecondaryUrl').value,
+    showHero: document.getElementById('homeShowHero').checked,
+    showPrimaryButton: document.getElementById('homeShowPrimaryButton').checked,
+    showSecondaryButton: document.getElementById('homeShowSecondaryButton').checked,
+    showSideCard: document.getElementById('homeShowSideCard').checked,
+    sideCardTitle: document.getElementById('homeSideCardTitle').value,
+    sideCardDescription: document.getElementById('homeSideCardDescription').value,
+    sideCardIcon: document.getElementById('homeSideCardIcon').value,
+    sideCardImage: document.getElementById('homeSideCardImage').value,
+    sideCardBackground: document.getElementById('homeSideCardBackground').value,
+    featuredCoursesMode: document.getElementById('homeFeaturedMode').value,
+    featuredCoursesLimit: Number(document.getElementById('homeFeaturedLimit').value || 6),
+    featuredCoursesEnabled: document.getElementById('homeFeaturedEnabled').checked,
+    featuredCourses: Array.from(document.querySelectorAll('.home-featured-course:checked')).map((input) => Number(input.value)),
+    visibleCategories: document.getElementById('homeVisibleCategories').value.split('\n').map((item) => item.trim()).filter(Boolean),
+    homeSections: collectHomeSections(),
+  };
+}
+
+function renderHomeFeaturedCourses() {
+  const selected = new Set((AppState.homeAdminConfig && AppState.homeAdminConfig.featuredCourses || []).map(Number));
+  const container = document.getElementById('homeFeaturedCourses');
+  const publishedCourses = AppState.cursos.filter((course) => course.estado === 'Publicado');
+  container.innerHTML = publishedCourses.length ? publishedCourses.map((course) => `
+    <label>
+      <input class="form-check-input home-featured-course" type="checkbox" value="${course.id}" ${selected.has(Number(course.id)) ? 'checked' : ''} onchange="renderHomeAdminPreview()">
+      <span>${escapeHtml(course.nombre)}</span>
+      <small>${escapeHtml(course.categoria || 'Sin categoria')}</small>
+    </label>
+  `).join('') : '<div class="text-secondary">No hay cursos publicados para seleccionar.</div>';
+}
+
+function renderHomeSectionsEditor() {
+  const sections = [...((AppState.homeAdminConfig && AppState.homeAdminConfig.homeSections) || [])].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  document.getElementById('homeSectionsEditor').innerHTML = sections.map((section, index) => `
+    <article class="home-section-editor" data-section-index="${index}">
+      <div class="home-section-row">
+        <input class="form-control home-section-order" type="number" value="${Number(section.order || index + 1)}" title="Orden">
+        <select class="form-select home-section-type">
+          ${['hero','categories','featuredCourses','benefits','learningPaths','metrics','banner','cta','news','newUsers','leaders','bpoContactCenter','custom'].map((type) => `<option value="${type}" ${section.type === type ? 'selected' : ''}>${type}</option>`).join('')}
+        </select>
+        <input class="form-control home-section-title" value="${escapeHtml(section.title || '')}" placeholder="Titulo de seccion">
+        <label class="home-section-visible"><input class="form-check-input" type="checkbox" ${section.visible !== false ? 'checked' : ''}>Visible</label>
+        <button class="btn btn-outline-danger btn-sm" type="button" onclick="removeHomeSection(${index})"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <textarea class="form-control home-section-description mt-2" rows="2" placeholder="Descripcion">${escapeHtml(section.description || '')}</textarea>
+      <div class="row g-2 mt-1">
+        <div class="col-md-4"><input class="form-control home-section-icon" value="${escapeHtml(section.icon || 'fa-layer-group')}" placeholder="Icono"></div>
+        <div class="col-md-4"><input class="form-control home-section-button-text" value="${escapeHtml(section.buttonText || '')}" placeholder="Texto boton"></div>
+        <div class="col-md-4"><input class="form-control home-section-button-url" value="${escapeHtml(section.buttonUrl || '')}" placeholder="URL boton"></div>
+      </div>
+    </article>
+  `).join('');
+}
+
+function collectHomeSections() {
+  return Array.from(document.querySelectorAll('.home-section-editor')).map((card, index) => ({
+    id: (AppState.homeAdminConfig.homeSections[index] && AppState.homeAdminConfig.homeSections[index].id) || `section-${Date.now()}-${index}`,
+    type: card.querySelector('.home-section-type').value,
+    title: card.querySelector('.home-section-title').value,
+    description: card.querySelector('.home-section-description').value,
+    icon: card.querySelector('.home-section-icon').value,
+    order: Number(card.querySelector('.home-section-order').value || index + 1),
+    visible: card.querySelector('.home-section-visible input').checked,
+    buttonText: card.querySelector('.home-section-button-text').value,
+    buttonUrl: card.querySelector('.home-section-button-url').value,
+    image: '',
+  }));
+}
+
+function addHomeSection() {
+  const config = collectHomeConfigForm();
+  config.homeSections.push({ id: `section-${Date.now()}`, type: 'custom', title: 'Nueva seccion', description: '', icon: 'fa-layer-group', order: config.homeSections.length + 1, visible: true, buttonText: '', buttonUrl: '', image: '' });
+  AppState.homeAdminConfig = config;
+  renderHomeSectionsEditor();
+  renderHomeAdminPreview();
+}
+
+function removeHomeSection(index) {
+  const config = collectHomeConfigForm();
+  config.homeSections.splice(index, 1);
+  AppState.homeAdminConfig = config;
+  renderHomeSectionsEditor();
+  renderHomeAdminPreview();
+}
+
+function renderHomeAdminPreview() {
+  if (!document.getElementById('homeAdminPreview')) return;
+  const config = collectHomeConfigForm();
+  const selectedCourses = AppState.cursos.filter((course) => config.featuredCourses.includes(Number(course.id))).slice(0, config.featuredCoursesLimit);
+  document.getElementById('homeAdminPreview').innerHTML = `
+    <div class="home-preview-hero">
+      <span>${escapeHtml(config.heroTopLabel)}</span>
+      <strong>${escapeHtml(config.heroTitle)}</strong>
+      <p>${escapeHtml(config.heroDescription)}</p>
+    </div>
+    <div class="home-preview-list">
+      <small>Secciones visibles: ${config.homeSections.filter((section) => section.visible).length}</small>
+      <small>Cursos seleccionados: ${selectedCourses.length}</small>
+      <small>Categorias visibles: ${config.visibleCategories.length}</small>
+    </div>`;
+}
+
+function previewHomeConfig() {
+  AppState.publicHomeConfig = collectHomeConfigForm();
+  AppState.publicCourses = AppState.cursos.filter((course) => AppState.publicHomeConfig.featuredCourses.includes(Number(course.id))).slice(0, AppState.publicHomeConfig.featuredCoursesLimit);
+  renderPublicHomeConfig();
+  renderPublicCategoryFilter();
+  renderPublicCatalog();
+  Swal.fire('Vista previa preparada', 'Abre la pagina publica o cierra sesion para ver la portada con estos cambios temporales.', 'info');
+}
+
+async function saveHomeConfig(publish) {
+  try {
+    const config = collectHomeConfigForm();
+    const result = await HomePageService.guardar(config, publish);
+    AppState.homeAdminConfig = result.config;
+    AppState.publicHomeConfig = null;
+    AppState.publicCourses = [];
+    toastSuccess(publish ? 'Pagina inicial publicada' : 'Cambios guardados');
+    fillHomeConfigForm(AppState.homeAdminConfig);
+    renderHomeFeaturedCourses();
+    renderHomeSectionsEditor();
+    renderHomeAdminPreview();
+  } catch (error) {
+    Swal.fire('No se pudo guardar', error.message, 'error');
+  }
+}
+
+async function restoreHomeDefaults() {
+  if (!(await confirmAction('Restaurar valores por defecto', 'Se reemplazara el borrador actual por la configuracion inicial.'))) return;
+  try {
+    const result = await HomePageService.restaurar(false);
+    AppState.homeAdminConfig = result.config;
+    fillHomeConfigForm(AppState.homeAdminConfig);
+    renderHomeFeaturedCourses();
+    renderHomeSectionsEditor();
+    renderHomeAdminPreview();
+    toastSuccess('Valores restaurados');
+  } catch (error) {
+    Swal.fire('No se pudo restaurar', error.message, 'error');
+  }
+}
+
 function renderMenu() {
   const rol = AppState.usuario && AppState.usuario.rol ? AppState.usuario.rol.nombre : 'Estudiante';
   const items = MENUS[rol] || MENUS.Estudiante;
@@ -341,8 +642,9 @@ function renderMenu() {
 }
 
 function showView(viewName) {
-  const studentBlockedViews = ['usuarios', 'cursos', 'modulos', 'lecciones', 'reportes', 'configuracion', 'administracion'];
+  const studentBlockedViews = ['usuarios', 'cursos', 'modulos', 'lecciones', 'reportes', 'configuracion', 'administracion', 'home-config'];
   if (isStudent() && studentBlockedViews.includes(viewName)) viewName = 'student-courses';
+  if (viewName === 'home-config' && !(AppState.usuario && AppState.usuario.rol && AppState.usuario.rol.nombre === 'Administrador')) viewName = 'dashboard';
   if (!isStudent() && viewName === 'student-courses') viewName = 'cursos';
   let target = document.getElementById(`view-${viewName}`);
   if (!target) {
@@ -358,6 +660,7 @@ function showView(viewName) {
 
   document.getElementById('viewTitle').textContent = target.dataset.title || 'Dashboard';
   if (viewName === 'plan') renderCurrentPlan();
+  if (viewName === 'home-config') loadHomeAdminConfig();
   if (isStudent() && viewName === 'student-courses') loadStudentCourses();
   if (viewName === 'evaluaciones') loadEvaluations();
   if (isStudent() && viewName === 'certificados') loadStudentCertificates();

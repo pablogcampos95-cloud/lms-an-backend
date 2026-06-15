@@ -4,7 +4,7 @@
       <img class="brand-logo" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
       <span>IA Learning Solutions</span>
     </a>
-    <nav class="public-nav" aria-label="Catalogo">
+    <nav id="publicNav" class="public-nav" aria-label="Catalogo">
       <a href="#publicCourses">Cursos</a>
       <a href="#publicBenefits">Beneficios</a>
       <a href="#publicCourses">Para empresas</a>
@@ -19,22 +19,22 @@
   </header>
 
   <main class="public-catalog-main">
-    <section class="public-hero">
+    <section id="publicHero" class="public-hero">
       <div>
-        <span class="public-kicker">CATALOGO CORPORATIVO IA</span>
-        <h1>Aprende habilidades que convierten conocimiento en resultados.</h1>
-        <p>Explora cursos de IA, productividad y transformacion digital. Para comenzar tu ruta personalizada, inicia sesion con tu cuenta asignada.</p>
-        <div class="public-hero-actions">
-          <a class="btn btn-gold btn-lg" href="#publicCourses"><i class="fa-solid fa-book-open me-2"></i>Explorar cursos</a>
-          <button class="btn btn-outline-light btn-lg" type="button" onclick="showLogin()"><i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar al LMS</button>
+        <span id="publicHeroTopLabel" class="public-kicker"></span>
+        <h1 id="publicHeroTitle"></h1>
+        <p id="publicHeroDescription"></p>
+        <div id="publicHeroActions" class="public-hero-actions">
         </div>
       </div>
-      <aside class="public-hero-card">
-        <div class="ai-core public-ai-core"><i class="fa-solid fa-brain"></i></div>
-        <strong>Conecta. Conoce. Convierte.</strong>
-        <span>Aprendizaje corporativo impulsado por IA.</span>
+      <aside id="publicHeroCard" class="public-hero-card">
+        <div id="publicHeroCardIcon" class="ai-core public-ai-core"><i class="fa-solid fa-brain"></i></div>
+        <strong id="publicHeroCardTitle"></strong>
+        <span id="publicHeroCardDescription"></span>
       </aside>
     </section>
+
+    <section id="publicCategories" class="public-benefits" aria-label="Categorias"></section>
 
     <section id="publicBenefits" class="public-benefits" aria-label="Beneficios">
       <article><i class="fa-solid fa-shield-halved"></i><strong>Acceso seguro</strong><span>Ingreso protegido por usuario y rol.</span></article>
@@ -46,7 +46,8 @@
       <div class="public-section-heading">
         <div>
           <span class="public-kicker">CURSOS DISPONIBLES</span>
-          <h2>Catalogo de cursos</h2>
+          <h2 id="publicCoursesTitle">Catalogo de cursos</h2>
+          <p id="publicCoursesDescription" class="text-secondary mb-0"></p>
         </div>
         <select id="publicCategoryFilter" class="form-select" aria-label="Filtrar por categoria">
           <option value="">Todas las categorias</option>
