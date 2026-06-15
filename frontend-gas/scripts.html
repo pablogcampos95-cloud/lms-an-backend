@@ -26,6 +26,7 @@ const AppState = {
   forumResponseModal: null,
   currentAttempt: null,
   evaluationHasAttempts: false,
+  publicCourses: [],
 };
 
 const loginContent = Object.freeze({
@@ -94,6 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.forumResponseModal = new bootstrap.Modal(document.getElementById('forumResponseModal'));
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
+  document.getElementById('openPublicLogin').addEventListener('click', showLogin);
+  document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
+  document.getElementById('publicCourseSearch').addEventListener('input', renderPublicCatalog);
+  document.getElementById('publicCategoryFilter').addEventListener('change', renderPublicCatalog);
   document.getElementById('logoutButton').addEventListener('click', handleLogout);
   document.getElementById('toggleSidebar').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('collapsed');
@@ -150,7 +155,7 @@ function handleExpiredSession() {
 async function boot() {
   const token = ApiService.getToken();
   if (!token) {
-    showLogin();
+    showPublicCatalog();
     return;
   }
 
@@ -159,8 +164,15 @@ async function boot() {
     await startSession(usuario);
   } catch (error) {
     AuthService.logout();
-    showLogin();
+    showPublicCatalog();
   }
+}
+
+function showPublicCatalog() {
+  document.getElementById('publicCatalogScreen').classList.remove('d-none');
+  document.getElementById('loginScreen').classList.add('d-none');
+  document.getElementById('appShell').classList.add('d-none');
+  loadPublicCatalog();
 }
 
 async function handleLogin(event) {
@@ -225,11 +237,13 @@ function configureRoleInterface() {
 }
 
 function showLogin() {
+  document.getElementById('publicCatalogScreen').classList.add('d-none');
   document.getElementById('loginScreen').classList.remove('d-none');
   document.getElementById('appShell').classList.add('d-none');
 }
 
 function showApp() {
+  document.getElementById('publicCatalogScreen').classList.add('d-none');
   document.getElementById('loginScreen').classList.add('d-none');
   document.getElementById('appShell').classList.remove('d-none');
 }
@@ -237,7 +251,76 @@ function showApp() {
 function handleLogout() {
   AuthService.logout();
   AppState.usuario = null;
-  showLogin();
+  showPublicCatalog();
+}
+
+async function loadPublicCatalog() {
+  const grid = document.getElementById('publicCoursesGrid');
+  if (AppState.publicCourses.length) {
+    renderPublicCatalog();
+    return;
+  }
+  grid.innerHTML = '<div class="public-loading"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catalogo...</div>';
+  try {
+    AppState.publicCourses = await CursosService.catalogoPublico();
+    renderPublicCategoryFilter();
+    renderPublicCatalog();
+  } catch (error) {
+    grid.innerHTML = `<div class="public-empty"><i class="fa-solid fa-circle-exclamation"></i><strong>No se pudo cargar el catalogo</strong><span>${escapeHtml(error.message)}</span></div>`;
+  }
+}
+
+function renderPublicCategoryFilter() {
+  const select = document.getElementById('publicCategoryFilter');
+  const current = select.value;
+  const categories = [...new Set(AppState.publicCourses.map((course) => course.categoria).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">Todas las categorias</option>' + categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join('');
+  select.value = categories.includes(current) ? current : '';
+}
+
+function renderPublicCatalog() {
+  const grid = document.getElementById('publicCoursesGrid');
+  const search = (document.getElementById('publicCourseSearch').value || '').trim().toLowerCase();
+  const category = document.getElementById('publicCategoryFilter').value;
+  const courses = AppState.publicCourses.filter((course) => {
+    const text = [course.nombre, course.descripcion_corta, course.descripcion_completa, course.categoria, course.campana_area].join(' ').toLowerCase();
+    return (!search || text.includes(search)) && (!category || course.categoria === category);
+  });
+  grid.innerHTML = courses.length ? courses.map((course) => `
+    <article class="public-course-card">
+      <div class="public-course-cover">
+        ${course.imagen_portada_url ? `<img src="${escapeHtml(course.imagen_portada_url)}" alt="Portada de ${escapeHtml(course.nombre)}">` : '<div class="public-course-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>'}
+        <span>Curso disponible</span>
+      </div>
+      <div class="public-course-body">
+        <span class="public-course-category">${escapeHtml(course.categoria || 'Curso corporativo')}</span>
+        <h3>${escapeHtml(course.nombre)}</h3>
+        <p>${escapeHtml(course.descripcion_corta || course.descripcion_completa || 'Curso publicado en IA Learning Solutions.')}</p>
+        <div class="public-course-meta">
+          <span><i class="fa-regular fa-clock"></i>${course.duracion_estimada_min || 0} min</span>
+          <span><i class="fa-solid fa-layer-group"></i>${course.cantidad_modulos || 0} modulos</span>
+        </div>
+        <button class="btn public-course-button" type="button" onclick="promptPublicLogin(${Number(course.id)})">
+          <i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar para ver curso
+        </button>
+      </div>
+    </article>
+  `).join('') : '<div class="public-empty"><i class="fa-solid fa-book-open"></i><strong>No encontramos cursos</strong><span>Prueba con otra busqueda o categoria.</span></div>';
+}
+
+function promptPublicLogin(courseId) {
+  const course = AppState.publicCourses.find((item) => Number(item.id) === Number(courseId));
+  const courseName = course && course.nombre;
+  Swal.fire({
+    icon: 'info',
+    title: 'Inicia sesion para continuar',
+    text: courseName ? `Para acceder a "${courseName}" debes ingresar con tu usuario asignado.` : 'Para acceder al curso debes ingresar con tu usuario asignado.',
+    confirmButtonText: 'Iniciar sesion',
+    showCancelButton: true,
+    cancelButtonText: 'Seguir explorando',
+  }).then((result) => {
+    if (result.isConfirmed) showLogin();
+  });
 }
 
 function renderMenu() {

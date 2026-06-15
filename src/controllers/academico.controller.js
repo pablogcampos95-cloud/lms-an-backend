@@ -16,6 +16,7 @@ const listarCursos = async (req, res) => {
   const filters = ['Administrador', 'Instructor'].includes(rol) ? req.query : { ...req.query, estado: 'Publicado' };
   return ok(res, await academicoService.listCursos(filters));
 };
+const listarCursosPublicos = async (req, res) => ok(res, await academicoService.listPublicCourses(req.query));
 const obtenerCurso = async (req, res) => ok(res, await academicoService.getCursoEstructura(req.params.id));
 const obtenerCursoPublicado = async (req, res) => {
   if (req.user.rol && req.user.rol.nombre === 'Estudiante') {
@@ -85,7 +86,7 @@ const completarLeccion = async (req, res) => {
 };
 
 module.exports = {
-  listarCursos, obtenerCurso, obtenerCursoPublicado, crearCurso, actualizarCurso, eliminarCurso, duplicarCurso, obtenerEstudiantesCurso, asignarEstudiantesCurso,
+  listarCursos, listarCursosPublicos, obtenerCurso, obtenerCursoPublicado, crearCurso, actualizarCurso, eliminarCurso, duplicarCurso, obtenerEstudiantesCurso, asignarEstudiantesCurso,
   listarModulos, crearModulo, actualizarModulo, eliminarModulo, ordenarModulo,
   listarLecciones, crearLeccion, actualizarLeccion, eliminarLeccion, ordenarLeccion,
   subirArchivo, completarLeccion,

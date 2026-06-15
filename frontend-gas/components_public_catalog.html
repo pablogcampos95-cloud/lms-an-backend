@@ -1,0 +1,60 @@
+<section id="publicCatalogScreen" class="public-catalog-screen">
+  <header class="public-catalog-header">
+    <a class="public-brand" href="#" onclick="event.preventDefault();">
+      <img class="brand-logo" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
+      <span>IA Learning Solutions</span>
+    </a>
+    <nav class="public-nav" aria-label="Catalogo">
+      <a href="#publicCourses">Cursos</a>
+      <a href="#publicBenefits">Beneficios</a>
+      <a href="#publicCourses">Para empresas</a>
+    </nav>
+    <div class="public-actions">
+      <label class="public-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input id="publicCourseSearch" type="search" placeholder="Que quieres aprender hoy" aria-label="Buscar cursos">
+      </label>
+      <button id="openPublicLogin" class="btn btn-public-login" type="button">Iniciar sesion</button>
+    </div>
+  </header>
+
+  <main class="public-catalog-main">
+    <section class="public-hero">
+      <div>
+        <span class="public-kicker">CATALOGO CORPORATIVO IA</span>
+        <h1>Aprende habilidades que convierten conocimiento en resultados.</h1>
+        <p>Explora cursos de IA, productividad y transformacion digital. Para comenzar tu ruta personalizada, inicia sesion con tu cuenta asignada.</p>
+        <div class="public-hero-actions">
+          <a class="btn btn-gold btn-lg" href="#publicCourses"><i class="fa-solid fa-book-open me-2"></i>Explorar cursos</a>
+          <button class="btn btn-outline-light btn-lg" type="button" onclick="showLogin()"><i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar al LMS</button>
+        </div>
+      </div>
+      <aside class="public-hero-card">
+        <div class="ai-core public-ai-core"><i class="fa-solid fa-brain"></i></div>
+        <strong>Conecta. Conoce. Convierte.</strong>
+        <span>Aprendizaje corporativo impulsado por IA.</span>
+      </aside>
+    </section>
+
+    <section id="publicBenefits" class="public-benefits" aria-label="Beneficios">
+      <article><i class="fa-solid fa-shield-halved"></i><strong>Acceso seguro</strong><span>Ingreso protegido por usuario y rol.</span></article>
+      <article><i class="fa-solid fa-chart-line"></i><strong>Avance medible</strong><span>Seguimiento por cursos, pasos y evaluaciones.</span></article>
+      <article><i class="fa-solid fa-building-user"></i><strong>Enfoque corporativo</strong><span>Experiencias alineadas a objetivos de negocio.</span></article>
+    </section>
+
+    <section id="publicCourses" class="public-courses-section">
+      <div class="public-section-heading">
+        <div>
+          <span class="public-kicker">CURSOS DISPONIBLES</span>
+          <h2>Catalogo de cursos</h2>
+        </div>
+        <select id="publicCategoryFilter" class="form-select" aria-label="Filtrar por categoria">
+          <option value="">Todas las categorias</option>
+        </select>
+      </div>
+      <div id="publicCoursesGrid" class="public-courses-grid">
+        <div class="public-loading"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catalogo...</div>
+      </div>
+    </section>
+  </main>
+</section>

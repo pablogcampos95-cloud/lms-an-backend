@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 
 const router = Router();
 
+router.get('/catalogo-publico', asyncHandler(controller.listarCursosPublicos));
 router.use(requireAuth);
 router.get('/', asyncHandler(controller.listarCursos));
 router.get('/:id/asignaciones', authorizeRoles('Administrador'), asyncHandler(controller.obtenerEstudiantesCurso));

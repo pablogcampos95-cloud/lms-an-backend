@@ -1,5 +1,10 @@
 <script>
 const CursosService = {
+  async catalogoPublico(params = {}) {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
+    const result = await ApiService.request(`/api/cursos/catalogo-publico${query ? `?${query}` : ''}`);
+    return result.data || [];
+  },
   async listar(params = {}) {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
     const result = await ApiService.request(`/api/cursos${query ? `?${query}` : ''}`);
