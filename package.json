@@ -4,8 +4,9 @@
   "description": "Backend del LMS corporativo de Automatizate Negocios",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "build": "node scripts/build-frontend.js",
+    "start": "npm run build && node src/server.js",
+    "dev": "npm run build && node --watch src/server.js"
   },
   "keywords": [
     "lms",

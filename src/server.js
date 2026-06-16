@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -18,12 +19,13 @@ const { notFoundHandler, errorHandler } = require('./middlewares/error.middlewar
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const publicDir = path.join(__dirname, '..', 'public');
 
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
   res.json({
     ok: true,
     message: 'LMS conectado a Supabase',
@@ -56,6 +58,12 @@ app.use('/api/lecciones', leccionesRoutes);
 app.use('/api/evaluaciones', evaluacionesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/estudiante', estudianteRoutes);
+
+app.use(express.static(publicDir));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  return res.sendFile(path.join(publicDir, 'index.html'));
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);

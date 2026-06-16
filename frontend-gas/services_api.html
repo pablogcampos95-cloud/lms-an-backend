@@ -1,5 +1,7 @@
 <script>
-const API_URL = 'https://lms-an-backend-production.up.railway.app';
+const API_URL = window.location.hostname.includes('googleusercontent.com')
+  ? 'https://lms-an-backend-production.up.railway.app'
+  : window.location.origin;
 
 const ApiService = {
   sessionExpiredNotified: false,
