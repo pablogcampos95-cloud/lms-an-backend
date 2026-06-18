@@ -290,9 +290,9 @@ async function loadPublicCatalog() {
 
 function getFallbackHomeConfig() {
   return {
-    heroTopLabel: 'FORMACION CORPORATIVA BPO & CONTACT CENTER',
-    heroTitle: 'Desarrolla habilidades que elevan el desempeno en operaciones BPO y Contact Center.',
-    heroDescription: 'Accede a cursos disenados para fortalecer la gestion, la productividad, la calidad, la atencion al cliente y los resultados comerciales de tus equipos.',
+    heroTopLabel: 'IA LEARNING SOLUTIONS',
+    heroTitle: 'Aprende con IA aplicada',
+    heroDescription: 'Cursos breves para equipos que quieren mejorar.',
     heroPrimaryButtonText: 'Explorar cursos',
     heroPrimaryButtonUrl: '#publicCourses',
     heroSecondaryButtonText: 'Ingresar al LMS',
@@ -302,8 +302,8 @@ function getFallbackHomeConfig() {
     showPrimaryButton: true,
     showSecondaryButton: true,
     showSideCard: true,
-    sideCardTitle: 'Aprende. Gestiona. Mejora.',
-    sideCardDescription: 'Formacion corporativa enfocada en desempeno operativo, calidad y experiencia del cliente.',
+    sideCardTitle: 'Conecta. Conoce. Convierte.',
+    sideCardDescription: 'Aprendizaje corporativo impulsado por IA.',
     sideCardIcon: 'fa-brain',
     featuredCoursesEnabled: true,
     featuredCoursesLimit: 6,
@@ -321,15 +321,16 @@ function getFallbackHomeConfig() {
 
 function renderPublicHomeConfig() {
   const config = AppState.publicHomeConfig || getFallbackHomeConfig();
+  const heroCopy = getCompactPublicHeroCopy(config);
   const hero = document.getElementById('publicHero');
   hero.classList.toggle('d-none', config.showHero === false);
   hero.style.setProperty('--public-accent', config.heroAccentColor || '#00d8ff');
   hero.style.backgroundImage = config.heroBackground
     ? `linear-gradient(135deg,rgba(8,30,65,.88),rgba(2,11,30,.92)), url("${String(config.heroBackground).replace(/["\\\n\r]/g, '')}")`
     : '';
-  document.getElementById('publicHeroTopLabel').textContent = config.heroTopLabel || '';
-  document.getElementById('publicHeroTitle').textContent = config.heroTitle || '';
-  document.getElementById('publicHeroDescription').textContent = config.heroDescription || '';
+  document.getElementById('publicHeroTopLabel').textContent = heroCopy.topLabel;
+  document.getElementById('publicHeroTitle').innerHTML = renderPublicHeroTitle(heroCopy.title);
+  document.getElementById('publicHeroDescription').textContent = heroCopy.description;
   document.getElementById('publicHeroActions').innerHTML = [
     config.showPrimaryButton !== false ? `<button class="btn btn-gold btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroPrimaryButtonUrl || '#publicCourses')}')"><i class="fa-solid fa-book-open me-2"></i>${escapeHtml(config.heroPrimaryButtonText || 'Explorar cursos')}</button>` : '',
     config.showSecondaryButton !== false ? `<button class="btn btn-outline-light btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroSecondaryButtonUrl || '#login')}')"><i class="fa-solid fa-right-to-bracket me-2"></i>${escapeHtml(config.heroSecondaryButtonText || 'Ingresar al LMS')}</button>` : '',
@@ -344,6 +345,22 @@ function renderPublicHomeConfig() {
     : `<i class="fa-solid ${escapeHtml(config.sideCardIcon || 'fa-brain')}"></i>`;
 
   renderPublicDynamicSections(config);
+}
+
+function getCompactPublicHeroCopy(config) {
+  const rawTitle = String(config.heroTitle || '').trim();
+  const rawDescription = String(config.heroDescription || '').trim();
+  const rawLabel = String(config.heroTopLabel || '').trim();
+  return {
+    topLabel: rawLabel && rawLabel.length <= 42 ? rawLabel : 'IA LEARNING SOLUTIONS',
+    title: rawTitle && rawTitle.length <= 54 ? rawTitle : 'Aprende con IA aplicada',
+    description: rawDescription && rawDescription.length <= 78 ? rawDescription : 'Cursos breves para equipos que quieren mejorar.',
+  };
+}
+
+function renderPublicHeroTitle(title) {
+  const safeTitle = escapeHtml(title || 'Aprende con IA aplicada');
+  return safeTitle.replace(/(IA aplicada|IA)$/i, '<span>$1</span>');
 }
 
 function handlePublicAction(url) {

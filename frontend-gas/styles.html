@@ -1203,91 +1203,93 @@
     min-width: 102px;
     min-height: 48px;
     border-radius: 14px;
-    color: #02110f;
-    background: linear-gradient(135deg, #24f2a3, #00d8ff);
+    color: #02111d;
+    background: linear-gradient(135deg, #13dcff, #2388ff);
+    box-shadow: 0 14px 36px rgba(0,136,255,.24);
   }
 
   .public-catalog-main {
     padding: 0 clamp(22px, 5vw, 72px) 80px;
   }
 
+  /* Refined blue public landing */
   .public-hero {
     display: grid;
     grid-template-columns: 1fr;
     place-items: center;
-    min-height: min(760px, calc(100vh - 104px));
-    margin: 0 auto 52px;
-    padding: clamp(70px, 9vw, 118px) 24px clamp(62px, 8vw, 98px);
+    min-height: min(650px, calc(100vh - 104px));
+    margin: 0 auto 46px;
+    padding: clamp(62px, 8vw, 96px) 24px clamp(58px, 7vw, 86px);
     text-align: center;
     border: 0;
     border-radius: 0;
     background:
-      radial-gradient(circle at 86% 5%, rgba(35,242,163,.18), transparent 28%),
-      radial-gradient(circle at 50% 22%, rgba(35,242,163,.08), transparent 36%),
-      linear-gradient(180deg, rgba(10,20,24,.96), rgba(6,12,19,.98) 78%, rgba(5,11,20,1)) !important;
+      radial-gradient(circle at 82% 0%, rgba(35,136,255,.22), transparent 30%),
+      radial-gradient(circle at 50% 18%, rgba(0,216,255,.12), transparent 38%),
+      linear-gradient(180deg, rgba(4,18,42,.98), rgba(5,16,35,.99) 72%, rgba(3,10,24,1)) !important;
     box-shadow: none;
   }
 
   .public-hero > div {
-    width: min(980px, 100%);
+    width: min(860px, 100%);
   }
 
   .public-kicker {
-    color: var(--mint);
+    color: #00d8ff;
   }
 
   .public-hero h1 {
-    max-width: 980px;
-    margin: 0 auto 30px;
-    font-size: clamp(3.2rem, 6.1vw, 6.4rem);
-    font-weight: 500;
-    line-height: .98;
-    letter-spacing: -.06em;
-  }
-
-  .public-hero h1::first-line {
+    max-width: 760px;
+    margin: 0 auto 18px;
+    font-size: clamp(3rem, 5.3vw, 5.6rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.055em;
     color: #f8fbff;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
   }
 
-  .public-hero h1 {
-    background: linear-gradient(180deg, #f8fbff 0 49%, #24f2a3 50%, #00d8ff 100%);
+  .public-hero h1 span {
+    background: linear-gradient(135deg, #00d8ff, #2388ff 58%, #6fdcff);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
   .public-hero p {
-    max-width: 660px;
-    margin: 0 auto 42px;
-    color: #dce5ef;
-    font-size: clamp(1.25rem, 2vw, 1.75rem);
-    line-height: 1.32;
+    max-width: 430px;
+    margin: 0 auto 28px;
+    color: #aec3da;
+    font-size: clamp(.98rem, 1.35vw, 1.15rem);
+    line-height: 1.55;
   }
 
   .public-hero-search-wrap {
     display: grid;
     justify-items: center;
-    gap: 14px;
-    margin-top: 8px;
+    gap: 12px;
+    margin-top: 6px;
   }
 
   .public-hero-search-wrap > strong {
-    color: #eef4fb;
-    font-size: clamp(1.25rem, 2vw, 1.7rem);
-    font-weight: 800;
+    color: #eaf4ff;
+    font-size: clamp(1rem, 1.4vw, 1.22rem);
+    font-weight: 750;
   }
 
   .public-hero-search {
-    width: min(520px, 92vw);
-    min-height: 70px;
+    width: min(470px, 92vw);
+    min-height: 60px;
     display: flex;
     align-items: center;
     gap: 14px;
     padding: 0 20px;
-    border: 1.5px solid var(--mint);
+    border: 1.5px solid #00d8ff;
     border-radius: 10px;
     background: rgba(8,11,18,.88);
-    box-shadow: 0 0 0 1px rgba(35,242,163,.04), 0 18px 58px rgba(0,0,0,.32);
+    box-shadow: 0 0 0 1px rgba(0,216,255,.05), 0 18px 58px rgba(0,92,180,.18);
   }
 
   .public-hero-search input {
@@ -1301,10 +1303,7 @@
   }
 
   .public-hero-search-wrap small {
-    max-width: 560px;
-    color: #f4f7fa;
-    font-size: 1.03rem;
-    font-weight: 800;
+    display: none;
   }
 
   .public-hero-actions {
@@ -1370,6 +1369,10 @@
     .public-hero {
       min-height: auto;
       padding: 62px 10px;
+    }
+
+    .public-hero h1 {
+      font-size: clamp(2.7rem, 14vw, 4.4rem);
     }
 
     .public-hero p {
