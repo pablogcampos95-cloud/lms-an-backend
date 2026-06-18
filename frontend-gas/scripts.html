@@ -862,10 +862,10 @@ function renderStudentDashboard(data) {
   if (featured) {
     if (featured.imagen_portada_url) {
       const safeCoverUrl = String(featured.imagen_portada_url).replace(/["\\\n\r]/g, '');
-      heroSection.style.backgroundImage = `linear-gradient(90deg, rgba(2, 15, 36, .96) 0%, rgba(2, 20, 45, .88) 42%, rgba(3, 25, 48, .52) 72%, rgba(3, 19, 39, .62) 100%), url("${safeCoverUrl}")`;
+      heroSection.style.setProperty('--course-cover-url', `url("${safeCoverUrl}")`);
       heroSection.classList.add('has-course-cover');
     } else {
-      heroSection.style.backgroundImage = '';
+      heroSection.style.removeProperty('--course-cover-url');
       heroSection.classList.remove('has-course-cover');
     }
     document.getElementById('featuredCourseName').textContent = featured.nombre;
@@ -873,7 +873,7 @@ function renderStudentDashboard(data) {
     document.getElementById('featuredCourseMeta').innerHTML = `<span><i class="fa-regular fa-clock"></i> ${featured.duracion_estimada_min || 0} min</span><span><i class="fa-solid fa-layer-group"></i> ${featured.cantidad_modulos || 0} modulos</span><span><i class="fa-solid fa-chart-line"></i> ${featured.avance}%</span>`;
     hero.querySelector('.hero-actions').innerHTML = `<button class="btn btn-gold btn-lg" type="button" onclick="openStudentCourse(${featured.id})"><i class="fa-solid fa-play me-2"></i>${featured.avance ? 'Continuar curso' : 'Comenzar curso'}</button>`;
   } else {
-    heroSection.style.backgroundImage = '';
+    heroSection.style.removeProperty('--course-cover-url');
     heroSection.classList.remove('has-course-cover');
     document.getElementById('featuredCourseName').textContent = 'Aun no tienes cursos asignados';
     description.textContent = 'Cuando el administrador te asigne un curso, aparecera aqui.';
@@ -883,8 +883,36 @@ function renderStudentDashboard(data) {
 
   const courses = data.cursos || [];
   document.getElementById('assignedCoursesGrid').innerHTML = courses.length ? courses.map((course) => `
-    <article class="visual-course-card course-theme-ai"><div class="course-image">${course.imagen_portada_url ? `<img class="student-course-cover" src="${escapeHtml(course.imagen_portada_url)}" alt="">` : '<div class="course-icon"><i class="fa-solid fa-graduation-cap"></i></div>'}<span class="course-status in-progress">${course.avance === 100 ? 'Completado' : 'Asignado'}</span></div><div class="course-card-body"><span class="course-category">${escapeHtml(course.categoria || 'CURSO')}</span><h3>${escapeHtml(course.nombre)}</h3><div class="course-meta"><span><i class="fa-regular fa-clock"></i> ${course.duracion_estimada_min || 0} min</span><span>${course.lecciones_completadas}/${course.total_lecciones} pasos</span></div><div class="course-progress-copy"><span>Progreso</span><strong>${course.avance}%</strong></div><div class="progress premium-progress"><div class="progress-bar" style="width:${course.avance}%"></div></div><button class="btn course-action" type="button" onclick="openStudentCourse(${course.id})">${course.avance ? 'Continuar aprendizaje' : 'Comenzar curso'}</button></div></article>
+    ${renderContinueWatchingCard(course)}
   `).join('') : '<div class="empty-state">No tienes cursos asignados.</div>';
+}
+
+function renderContinueWatchingCard(course) {
+  const safeCoverUrl = course.imagen_portada_url ? String(course.imagen_portada_url).replace(/["\\\n\r]/g, '') : '';
+  const action = course.avance ? 'Continuar curso' : 'Iniciar curso';
+  const status = course.avance === 100 ? 'Completado' : (course.avance > 0 ? 'En progreso' : 'No iniciado');
+  const completed = Number(course.lecciones_completadas || 0);
+  const total = Number(course.total_lecciones || 0);
+  return `
+    <article class="continue-course-card" ${safeCoverUrl ? `style="--continue-cover:url('${escapeHtml(safeCoverUrl)}')"` : ''}>
+      <button class="continue-course-hitbox" type="button" onclick="openStudentCourse(${Number(course.id)})" aria-label="Ingresar al curso ${escapeHtml(course.nombre)}"></button>
+      <div class="continue-course-content">
+        <div>
+          <span class="course-status in-progress">${escapeHtml(status)}</span>
+          <span class="course-category">${escapeHtml(course.categoria || 'CURSO')}</span>
+          <h3>${escapeHtml(course.nombre)}</h3>
+          <p>${escapeHtml(course.descripcion_corta || course.descripcion_completa || 'Continua avanzando en este curso asignado.')}</p>
+          <div class="course-meta">
+            <span><i class="fa-regular fa-clock"></i> ${course.duracion_estimada_min || 0} min</span>
+            <span><i class="fa-solid fa-layer-group"></i> ${completed}/${total} pasos</span>
+            <span><i class="fa-solid fa-chart-line"></i> ${course.avance}%</span>
+          </div>
+        </div>
+        <button class="btn btn-gold continue-course-button" type="button" onclick="openStudentCourse(${Number(course.id)})"><i class="fa-solid fa-play me-2"></i>${action}</button>
+      </div>
+      <div class="continue-course-progress"><span style="width:${Number(course.avance || 0)}%"></span></div>
+    </article>
+  `;
 }
 
 async function openStudentCourse(id) {
