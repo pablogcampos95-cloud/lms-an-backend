@@ -517,13 +517,21 @@
   .student-player-cover { min-height: 250px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 38px 42px; color: #fff; background-color: #092143; background-position: center center; background-repeat: no-repeat; background-size: cover; }
   .student-player-cover h2 { max-width: 900px; margin: 8px 0; font-size: clamp(1.65rem, 2.65vw, 2.65rem);line-height:1.08; }.student-player-cover p { max-width: 760px; margin: 0; color: #d7e4f2; }
   .student-player-progress { display: grid; place-items: center; flex: 0 0 92px; width: 92px; height: 92px; border: 1px solid rgba(35,224,199,.5); border-radius: 50%; background: rgba(2,15,36,.75); }.student-player-progress strong { color: var(--cyan); font-size: 1.3rem; }.student-player-progress span { color: var(--muted); font-size: .7rem; }
-  .student-player-layout { display: grid; grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); min-height: 560px; }
+  .student-player-layout { position: relative; display: grid; grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); min-height: 560px; }
+  .student-player-layout.outline-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .student-player-layout.outline-collapsed .student-player-sidebar { display: none; }
+  .student-player-layout.outline-open { grid-template-columns: minmax(0, 1fr); }
+  .student-player-layout.outline-open .student-player-sidebar { position: absolute; inset: 0 auto 0 0; z-index: 6; width: min(370px, 88vw); box-shadow: 28px 0 70px rgba(0,0,0,.55); border-right: 1px solid var(--line-strong); }
   .student-player-sidebar { padding: 20px 14px; overflow-y: auto; border-right: 1px solid var(--line); background: #061832; }
-  .student-player-sidebar-title { padding: 8px 10px 18px; color: var(--text); font-weight: 700; }
+  .student-player-sidebar-title { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px 18px;color:var(--text);font-weight:700; }
+  .student-player-sidebar-title button { width:34px;height:34px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03); }
+  .student-player-sidebar-title button:hover { color:var(--cyan);border-color:var(--cyan); }
   .student-outline-module { padding: 18px 10px 8px; color: var(--cyan); font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
   .student-outline-step { width: 100%; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px; color: var(--muted); text-align: left; border: 1px solid transparent; border-radius: 12px; background: transparent; }
   .student-outline-step:hover, .student-outline-step.active { color: var(--text); border-color: var(--line-strong); background: rgba(16,85,125,.28); }.student-outline-step > span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(35,224,199,.1); }.student-outline-step strong, .student-outline-step small { display: block; }.student-outline-step strong { font-size: .82rem; }.student-outline-step small { margin-top: 3px; font-size: .66rem; }.student-outline-step > i { color: #35d59b; }
   .student-player-content { min-width: 0; padding: 34px 40px; background: linear-gradient(145deg, #071a36, #040f22); }
+  .student-outline-toggle { display:inline-flex;align-items:center;justify-content:center;margin-bottom:22px;padding:10px 14px;color:var(--cyan);font-size:.78rem;font-weight:800;border:1px solid var(--line-strong);border-radius:12px;background:rgba(0,216,255,.06); }
+  .student-outline-toggle:hover { color:#031326;background:var(--cyan); }
   .student-lesson-heading { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 24px; }.student-lesson-heading > div > span { color: var(--cyan); font-size: .72rem; font-weight: 800; text-transform: uppercase; }.student-lesson-heading h2 { margin: 5px 0 8px;font-size:clamp(1.45rem,2.25vw,2.2rem);line-height:1.14; }.student-lesson-heading p { margin: 0; color: var(--muted);line-height:1.65; }
   .student-player-content .lesson-content { min-height: 330px; padding: 24px; color: var(--text); border: 1px solid var(--line); border-radius: 18px; background: rgba(2,12,29,.72); overflow: visible; }
   .student-player-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }.preview-mode-label { color: var(--muted); font-size: .78rem; }.preview-mode-label i { color: var(--cyan); }
@@ -1092,7 +1100,7 @@
   }
 
   .student-player-layout {
-    min-height: clamp(620px, 78vh, 920px);
+    min-height: clamp(680px, 82vh, 980px);
   }
 
   .student-player-sidebar {
@@ -1100,18 +1108,57 @@
   }
 
   .student-player-content {
+    padding: clamp(22px, 2.6vw, 46px);
     background:
       radial-gradient(circle at 100% 0%, rgba(35,242,163,.08), transparent 30%),
       linear-gradient(145deg, #07111d, #040a12);
   }
 
   .student-player-content .lesson-content {
-    min-height: clamp(420px, 58vh, 720px);
+    min-height: clamp(520px, 68vh, 840px);
     max-width: 100%;
     overflow: auto;
     overflow-wrap: anywhere;
     border-color: rgba(0,216,255,.18);
     background: rgba(6,13,22,.92);
+  }
+
+  .content-wrap:has(#view-student-course-player.active) {
+    width: 100%;
+    max-width: none;
+    padding: clamp(14px, 1.6vw, 24px);
+  }
+
+  #view-student-course-player .student-course-page-body {
+    border-radius: 22px;
+  }
+
+  #view-student-course-player .student-player-cover {
+    min-height: clamp(190px, 22vh, 260px);
+  }
+
+  #view-student-course-player .student-player-layout.outline-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #view-student-course-player .student-player-layout.outline-collapsed .student-player-sidebar {
+    display: none;
+  }
+
+  #view-student-course-player .student-player-layout.outline-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #view-student-course-player .student-player-layout.outline-open .student-player-sidebar {
+    display: block;
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 6;
+    width: min(370px, 88vw);
+    max-height: none;
+    border-right: 1px solid var(--line-strong);
+    border-bottom: 0;
+    box-shadow: 28px 0 70px rgba(0,0,0,.55);
   }
 
   .responsive-embed,

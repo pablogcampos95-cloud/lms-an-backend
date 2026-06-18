@@ -14,6 +14,7 @@ const AppState = {
   courseAssignmentModal: null,
   studentLessons: [],
   studentLessonIndex: 0,
+  studentOutlineOpen: false,
   dashboardData: null,
   previewMode: false,
   evaluaciones: [],
@@ -930,6 +931,7 @@ async function openStudentCourse(id) {
     AppState.studentLessons = buildStudentJourney(AppState.cursoActual);
     const firstPending = AppState.studentLessons.findIndex((item) => !item.completada && !(item.progreso && item.progreso.completado));
     AppState.studentLessonIndex = firstPending >= 0 ? firstPending : Math.max(AppState.studentLessons.length - 1, 0);
+    AppState.studentOutlineOpen = false;
     renderStudentCoursePlayer();
     document.querySelectorAll('.modal-backdrop').forEach((element) => element.remove());
     document.body.classList.remove('modal-open');
@@ -1778,13 +1780,18 @@ function renderStudentCoursePlayer() {
     return;
   }
   const cover = curso.imagen_portada_url ? `style="background-image:linear-gradient(90deg,rgba(2,13,31,.94),rgba(2,20,42,.55)),url('${escapeHtml(curso.imagen_portada_url)}')"` : '';
+  const outlineOpen = AppState.studentOutlineOpen ? 'outline-open' : 'outline-collapsed';
   const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
   container.innerHTML = `
     <div class="student-course-player">
       <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
-      <div class="student-player-layout">
-        <aside class="student-player-sidebar"><div class="student-player-sidebar-title">Contenido del curso</div>${renderStudentJourneyOutline()}</aside>
+      <div class="student-player-layout ${outlineOpen}">
+        <aside class="student-player-sidebar">
+          <div class="student-player-sidebar-title"><span>Contenido del curso</span><button type="button" onclick="toggleStudentOutline(false)" aria-label="Ocultar modulos"><i class="fa-solid fa-xmark"></i></button></div>
+          ${renderStudentJourneyOutline()}
+        </aside>
         <main class="student-player-content">
+          <button class="student-outline-toggle" type="button" onclick="toggleStudentOutline(true)"><i class="fa-solid fa-list-check me-2"></i>Mostrar modulos</button>
           ${activityContent}
           <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Foro' ? '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
         </main>
@@ -1793,6 +1800,11 @@ function renderStudentCoursePlayer() {
   if (leccion.es_actividad && leccion.tipo_actividad === 'Foro' && !AppState.previewMode) {
     setTimeout(() => loadForumWorkspace(leccion.id, `integratedForum-${leccion.id}`), 0);
   }
+}
+
+function toggleStudentOutline(open) {
+  AppState.studentOutlineOpen = Boolean(open);
+  renderStudentCoursePlayer();
 }
 
 function journeyActivityState(activity) { const record=activity.tipo_actividad==='Foro'?activity.respuesta:activity.intento;if(activity.completada)return{label:activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Aprobado'?'Aprobada':'Completado',className:'text-success',icon:'fa-circle-check',message:''};if(record&&((activity.tipo_actividad==='Evaluacion'&&record.estado==='PendienteCalificacion')||(activity.tipo_actividad==='Foro'&&record.estado!=='Calificado'&&activity.condicion_desbloqueo!=='Responder')))return{label:'Pendiente de calificacion',className:'text-warning',icon:'fa-clock',message:activity.tipo_actividad==='Foro'?'Tu respuesta esta pendiente de revision por el instructor.':'Tu evaluacion esta pendiente de revision por el instructor.'};if(activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Desaprobado')return{label:'Desaprobada',className:'text-danger',icon:'fa-circle-xmark',message:activity.bloquea_avance?'Debes aprobar esta evaluacion para continuar.':''};return{label:activity.bloqueado?'Bloqueado':'Disponible',className:activity.bloqueado?'text-warning':'text-info',icon:activity.bloqueado?'fa-lock':'fa-circle-play',message:activity.bloquea_avance?(activity.mensaje_bloqueo||(activity.tipo_actividad==='Foro'?'Debes completar este foro para continuar.':'Debes completar esta evaluacion para continuar.')):''}; }
@@ -1821,7 +1833,7 @@ function renderStudentJourneyOutline() {
   }).join('');
 }
 
-function selectStudentLesson(index) { if (AppState.studentLessons[index].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
+function selectStudentLesson(index) { if (AppState.studentLessons[index].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = index; AppState.studentOutlineOpen = false; renderStudentCoursePlayer(); }
 
 function navigateStudentLesson(offset) { const target = AppState.studentLessonIndex + offset; if (AppState.studentLessons[target] && AppState.studentLessons[target].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = target; renderStudentCoursePlayer(); }
 async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
