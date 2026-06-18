@@ -668,13 +668,28 @@
   .global-search input::placeholder { color: var(--disabled); }
   .notification-button { position: relative; }
   .notification-button span { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border: 2px solid #071426; border-radius: 50%; background: var(--gold); }
-  .profile-chip { min-width: 155px; display: flex; align-items: center; gap: 9px; padding: 5px 9px 5px 5px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,0.025); }
+  .profile-chip { min-width: 155px; display: flex; align-items: center; gap: 9px; padding: 5px 9px 5px 5px; color: var(--text); text-align: left; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,0.025); }
+  .profile-chip:hover, .profile-chip[aria-expanded="true"] { border-color: var(--cyan); background: rgba(0,216,255,.08); }
   .profile-avatar { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; color: #041022; border: 1px solid rgba(255,255,255,0.12); border-radius: 11px; background: var(--gradient); }
   .profile-copy { min-width: 0; flex: 1; }
   .profile-copy div, .profile-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .profile-copy div { font-size: 0.78rem; }
   .profile-copy small { color: var(--muted); font-size: 0.65rem; }
   .profile-chevron { color: var(--disabled); font-size: 0.65rem; }
+  .topbar-dropdown { min-width: 270px; padding: 10px; border: 1px solid var(--line-strong); border-radius: 18px; background: rgba(5,13,28,.98); box-shadow: 0 22px 60px rgba(0,0,0,.52); backdrop-filter: blur(18px); }
+  .notification-menu { min-width: 340px; }
+  .dropdown-heading { display: grid; gap: 2px; padding: 8px 10px 12px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .dropdown-heading strong { color: var(--text); font-size: .9rem; }
+  .dropdown-heading small { color: var(--muted); font-size: .72rem; }
+  .topbar-dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px; color: #dcecff; border-radius: 12px; white-space: normal; }
+  .topbar-dropdown-item:hover, .topbar-dropdown-item:focus { color: var(--text); background: rgba(0,216,255,.09); }
+  .topbar-dropdown-item i { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; color: var(--cyan); border-radius: 10px; background: rgba(0,216,255,.1); }
+  .topbar-dropdown-item span { display: grid; gap: 1px; min-width: 0; }
+  .topbar-dropdown-item strong { font-size: .78rem; }
+  .topbar-dropdown-item small { color: var(--muted); font-size: .68rem; }
+  .topbar-dropdown-item.danger { color: #ffbdc6; }
+  .topbar-dropdown-item.danger i { color: #ff5c75; background: rgba(255,92,117,.12); }
+  .topbar-dropdown .dropdown-divider { border-color: var(--line); }
 
   .learning-hero { min-height: 390px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); overflow: hidden; position: relative; border: 1px solid var(--line-strong); border-radius: 26px; background: radial-gradient(circle at 82% 45%, rgba(0,216,255,0.2), transparent 26%), linear-gradient(115deg, #0b1e3b 0%, #0b2245 55%, #071426 100%); box-shadow: var(--shadow); }
   .learning-hero.has-course-cover {

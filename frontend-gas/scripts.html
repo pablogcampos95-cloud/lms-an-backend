@@ -206,8 +206,12 @@ async function handleLogin(event) {
 
 async function startSession(usuario) {
   AppState.usuario = usuario;
-  document.getElementById('sessionName').textContent = usuario.Nombres || usuario.usuario;
-  document.getElementById('sessionRole').textContent = usuario.rol ? usuario.rol.nombre : 'Sin rol';
+  const displayName = usuario.Nombres || usuario.usuario;
+  const displayRole = usuario.rol ? usuario.rol.nombre : 'Sin rol';
+  document.getElementById('sessionName').textContent = displayName;
+  document.getElementById('sessionRole').textContent = displayRole;
+  document.getElementById('profileMenuName').textContent = displayName;
+  document.getElementById('profileMenuRole').textContent = displayRole;
   document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   renderMenu();
   configureRoleInterface();

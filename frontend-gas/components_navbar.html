@@ -1,7 +1,6 @@
 <header class="topbar">
   <div class="topbar-primary">
     <button id="toggleSidebar" class="btn topbar-icon-button" type="button" title="Contraer menu"><i class="fa-solid fa-bars"></i></button>
-    <img class="brand-logo brand-logo-header" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
     <span id="viewTitle" class="visually-hidden">Inicio</span>
     <nav class="main-navigation" aria-label="Navegacion principal">
       <button type="button" onclick="showView('dashboard')"><i class="fa-solid fa-house"></i><span>Inicio</span></button>
@@ -13,11 +12,46 @@
   </div>
   <div class="topbar-actions">
     <label class="global-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Buscar en el LMS" aria-label="Buscar"></label>
-    <button class="topbar-icon-button notification-button" type="button" title="Notificaciones"><i class="fa-regular fa-bell"></i><span></span></button>
-    <div class="profile-chip">
-      <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
-      <div class="profile-copy"><div id="sessionName" class="fw-semibold">Usuario</div><small id="sessionRole">Rol</small></div>
-      <i class="fa-solid fa-chevron-down profile-chevron"></i>
+    <div class="dropdown">
+      <button id="notificationsButton" class="topbar-icon-button notification-button" type="button" title="Notificaciones" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <i class="fa-regular fa-bell"></i><span></span>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end topbar-dropdown notification-menu">
+        <div class="dropdown-heading">
+          <strong>Notificaciones</strong>
+          <small>Actividad reciente</small>
+        </div>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showView('dashboard')">
+          <i class="fa-solid fa-chart-line"></i>
+          <span><strong>Revisa tu avance</strong><small>Consulta el resumen de aprendizaje.</small></span>
+        </button>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showCoursesHome()">
+          <i class="fa-solid fa-graduation-cap"></i>
+          <span><strong>Cursos asignados</strong><small>Continua desde tu ultimo progreso.</small></span>
+        </button>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showView('evaluaciones')">
+          <i class="fa-solid fa-clipboard-check"></i>
+          <span><strong>Evaluaciones</strong><small>Verifica tus actividades pendientes.</small></span>
+        </button>
+      </div>
+    </div>
+    <div class="dropdown">
+      <button class="profile-chip" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+        <div class="profile-copy"><div id="sessionName" class="fw-semibold">Usuario</div><small id="sessionRole">Rol</small></div>
+        <i class="fa-solid fa-chevron-down profile-chevron"></i>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end topbar-dropdown profile-menu">
+        <div class="dropdown-heading">
+          <strong id="profileMenuName">Usuario</strong>
+          <small id="profileMenuRole">Rol</small>
+        </div>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showView('plan')"><i class="fa-solid fa-route"></i><span>Mi plan</span></button>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showCoursesHome()"><i class="fa-solid fa-graduation-cap"></i><span>Mis cursos</span></button>
+        <button class="dropdown-item topbar-dropdown-item" type="button" onclick="showView('certificados')"><i class="fa-solid fa-award"></i><span>Mis certificados</span></button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item topbar-dropdown-item danger" type="button" onclick="handleLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>Cerrar sesion</span></button>
+      </div>
     </div>
     <button id="logoutButton" class="btn topbar-icon-button" type="button" title="Cerrar sesion"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
   </div>
