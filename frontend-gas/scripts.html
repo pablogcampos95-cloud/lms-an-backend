@@ -29,6 +29,7 @@ const AppState = {
   publicCourses: [],
   publicHomeConfig: null,
   homeAdminConfig: null,
+  publicSearchTypewriter: null,
 };
 
 const loginContent = Object.freeze({
@@ -265,6 +266,7 @@ async function loadPublicCatalog() {
   const grid = document.getElementById('publicCoursesGrid');
   if (AppState.publicHomeConfig) {
     renderPublicCatalog();
+    startPublicSearchTypewriter();
     return;
   }
   grid.innerHTML = '<div class="public-loading"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catalogo...</div>';
@@ -275,6 +277,7 @@ async function loadPublicCatalog() {
     renderPublicHomeConfig();
     renderPublicCategoryFilter();
     renderPublicCatalog();
+    startPublicSearchTypewriter();
   } catch (error) {
     try {
       AppState.publicCourses = await CursosService.catalogoPublico();
@@ -282,6 +285,7 @@ async function loadPublicCatalog() {
       renderPublicHomeConfig();
       renderPublicCategoryFilter();
       renderPublicCatalog();
+      startPublicSearchTypewriter();
     } catch (fallbackError) {
       grid.innerHTML = `<div class="public-empty"><i class="fa-solid fa-circle-exclamation"></i><strong>No se pudo cargar el catalogo</strong><span>${escapeHtml(error.message)}</span></div>`;
     }
@@ -291,7 +295,7 @@ async function loadPublicCatalog() {
 function getFallbackHomeConfig() {
   return {
     heroTopLabel: 'IA LEARNING SOLUTIONS',
-    heroTitle: 'Aprende con IA aplicada',
+    heroTitle: 'Aprende con Rutas a medida',
     heroDescription: 'Cursos breves para equipos que quieren mejorar.',
     heroPrimaryButtonText: 'Explorar cursos',
     heroPrimaryButtonUrl: '#publicCourses',
@@ -351,16 +355,69 @@ function getCompactPublicHeroCopy(config) {
   const rawTitle = String(config.heroTitle || '').trim();
   const rawDescription = String(config.heroDescription || '').trim();
   const rawLabel = String(config.heroTopLabel || '').trim();
+  const isLegacyHeroTitle = rawTitle.toLowerCase() === 'aprende con ia aplicada' || rawTitle.length > 54;
   return {
     topLabel: rawLabel && rawLabel.length <= 42 ? rawLabel : 'IA LEARNING SOLUTIONS',
-    title: rawTitle && rawTitle.length <= 54 ? rawTitle : 'Aprende con IA aplicada',
+    title: rawTitle && !isLegacyHeroTitle ? rawTitle : 'Aprende con Rutas a medida',
     description: rawDescription && rawDescription.length <= 78 ? rawDescription : 'Cursos breves para equipos que quieren mejorar.',
   };
 }
 
 function renderPublicHeroTitle(title) {
-  const safeTitle = escapeHtml(title || 'Aprende con IA aplicada');
-  return safeTitle.replace(/(IA aplicada|IA)$/i, '<span>$1</span>');
+  const safeTitle = escapeHtml(title || 'Aprende con Rutas a medida');
+  return safeTitle.replace(/(Rutas a medida|IA aplicada|IA)$/i, '<span>$1</span>');
+}
+
+function startPublicSearchTypewriter() {
+  const inputs = ['publicCourseSearch', 'publicHeroSearch']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  if (!inputs.length) return;
+
+  clearInterval(AppState.publicSearchTypewriter);
+  const courseNames = AppState.publicCourses
+    .map((course) => String(course.nombre || '').trim())
+    .filter(Boolean)
+    .slice(0, 7);
+  const phrases = courseNames.length ? courseNames : [
+    'Atencion al cliente con IA',
+    'Productividad para equipos',
+    'Calidad y monitoreo',
+    'Ventas consultivas',
+  ];
+
+  let phraseIndex = 0;
+  let charIndex = 0;
+  let deleting = false;
+  let pauseTicks = 0;
+
+  const setPlaceholder = (value) => {
+    inputs.forEach((input) => {
+      if (!input.value && document.activeElement !== input) {
+        input.placeholder = value || 'Buscar rutas y cursos';
+      }
+    });
+  };
+
+  AppState.publicSearchTypewriter = setInterval(() => {
+    const phrase = phrases[phraseIndex % phrases.length];
+    if (pauseTicks > 0) {
+      pauseTicks -= 1;
+      return;
+    }
+
+    charIndex += deleting ? -1 : 1;
+    setPlaceholder(phrase.slice(0, Math.max(0, charIndex)));
+
+    if (!deleting && charIndex >= phrase.length) {
+      deleting = true;
+      pauseTicks = 12;
+    } else if (deleting && charIndex <= 0) {
+      deleting = false;
+      phraseIndex += 1;
+      pauseTicks = 4;
+    }
+  }, 82);
 }
 
 function handlePublicAction(url) {

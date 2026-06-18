@@ -30,12 +30,22 @@
     margin: 0;
     min-height: 100vh;
     overflow-x: hidden;
+    zoom: .8;
     background:
       radial-gradient(circle at 82% 8%, rgba(22, 119, 255, 0.16), transparent 28%),
       radial-gradient(circle at 16% 85%, rgba(33, 230, 182, 0.09), transparent 28%),
       var(--bg);
     color: var(--text);
     font-family: "Manrope", system-ui, sans-serif;
+  }
+
+  @supports not (zoom: 1) {
+    body {
+      width: 125%;
+      min-height: 125vh;
+      transform: scale(.8);
+      transform-origin: top left;
+    }
   }
 
   h1, h2, h3, h4, h5, h6, .fw-bold { font-family: "Space Grotesk", "Manrope", sans-serif; }
@@ -1157,15 +1167,16 @@
   }
 
   .public-brand span {
-    font-size: clamp(1.05rem, 1.7vw, 1.55rem);
-    letter-spacing: -.04em;
+    font-size: clamp(.86rem, 1.2vw, 1.06rem);
+    letter-spacing: -.025em;
+    opacity: .92;
   }
 
   .public-brand img {
-    width: 54px;
-    height: 54px;
-    border-color: rgba(35,242,163,.32);
-    border-radius: 16px;
+    width: 42px;
+    height: 42px;
+    border-color: rgba(0,216,255,.32);
+    border-radius: 14px;
     background: rgba(0,0,0,.22);
   }
 
