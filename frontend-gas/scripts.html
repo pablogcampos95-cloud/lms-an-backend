@@ -369,21 +369,28 @@ function renderPublicHeroTitle(title) {
 }
 
 function startPublicSearchTypewriter() {
-  const inputs = ['publicCourseSearch', 'publicHeroSearch']
-    .map((id) => document.getElementById(id))
-    .filter(Boolean);
-  if (!inputs.length) return;
+  const input = document.getElementById('publicHeroSearch');
+  const headerSearch = document.getElementById('publicCourseSearch');
+  if (!input) return;
 
   clearInterval(AppState.publicSearchTypewriter);
-  const courseNames = AppState.publicCourses
-    .map((course) => String(course.nombre || '').trim())
+  if (headerSearch) headerSearch.placeholder = 'Buscar cursos y rutas';
+
+  const configuredRoutes = ((AppState.publicHomeConfig && AppState.publicHomeConfig.visibleCategories) || [])
+    .map((category) => String(category || '').trim())
     .filter(Boolean)
-    .slice(0, 7);
-  const phrases = courseNames.length ? courseNames : [
-    'Atencion al cliente con IA',
-    'Productividad para equipos',
-    'Calidad y monitoreo',
+    .filter((category, index, routes) => routes.indexOf(category) === index);
+  const phrases = configuredRoutes.length ? configuredRoutes : [
+    'Atencion al cliente',
     'Ventas consultivas',
+    'Calidad y monitoreo',
+    'Productividad operativa',
+    'Gestion de llamadas',
+    'Back Office',
+    'Supervision',
+    'Herramientas digitales',
+    'IA aplicada al Contact Center',
+    'Experiencia del cliente',
   ];
 
   let phraseIndex = 0;
@@ -392,11 +399,9 @@ function startPublicSearchTypewriter() {
   let pauseTicks = 0;
 
   const setPlaceholder = (value) => {
-    inputs.forEach((input) => {
-      if (!input.value && document.activeElement !== input) {
-        input.placeholder = value || 'Buscar rutas y cursos';
-      }
-    });
+    if (!input.value && document.activeElement !== input) {
+      input.placeholder = value || 'Buscar rutas de aprendizaje';
+    }
   };
 
   AppState.publicSearchTypewriter = setInterval(() => {
@@ -417,7 +422,7 @@ function startPublicSearchTypewriter() {
       phraseIndex += 1;
       pauseTicks = 4;
     }
-  }, 82);
+  }, 86);
 }
 
 function handlePublicAction(url) {
@@ -436,7 +441,7 @@ function renderPublicDynamicSections(config) {
   const benefitsSection = sections.find((section) => section.type === 'benefits');
   const coursesSection = sections.find((section) => section.type === 'featuredCourses');
   document.getElementById('publicCategories').classList.toggle('d-none', !categoriesSection || categoriesSection.visible === false);
-  document.getElementById('publicCategories').innerHTML = (config.visibleCategories || []).slice(0, 9).map((category) => `<article><i class="fa-solid fa-layer-group"></i><strong>${escapeHtml(category)}</strong><span>Ruta disponible en el catalogo.</span></article>`).join('');
+  document.getElementById('publicCategories').innerHTML = (config.visibleCategories || []).map((category) => `<article><i class="fa-solid fa-layer-group"></i><strong>${escapeHtml(category)}</strong><span>Ruta disponible en el catalogo.</span></article>`).join('');
   document.getElementById('publicBenefits').classList.toggle('d-none', !benefitsSection || benefitsSection.visible === false);
   document.getElementById('publicCourses').classList.toggle('d-none', !coursesSection || coursesSection.visible === false || config.featuredCoursesEnabled === false);
   document.getElementById('publicCoursesTitle').textContent = coursesSection && coursesSection.title ? coursesSection.title : 'Catalogo de cursos';
