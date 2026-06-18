@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('openPublicLogin').addEventListener('click', showLogin);
   document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
   document.getElementById('publicCourseSearch').addEventListener('input', renderPublicCatalog);
+  document.getElementById('publicHeroSearch').addEventListener('input', syncPublicHeroSearch);
   document.getElementById('publicCategoryFilter').addEventListener('change', renderPublicCatalog);
   document.getElementById('logoutButton').addEventListener('click', handleLogout);
   document.getElementById('toggleSidebar').addEventListener('click', () => {
@@ -379,7 +380,7 @@ function renderPublicCategoryFilter() {
 
 function renderPublicCatalog() {
   const grid = document.getElementById('publicCoursesGrid');
-  const search = (document.getElementById('publicCourseSearch').value || '').trim().toLowerCase();
+  const search = (document.getElementById('publicCourseSearch').value || document.getElementById('publicHeroSearch').value || '').trim().toLowerCase();
   const category = document.getElementById('publicCategoryFilter').value;
   const courses = AppState.publicCourses.filter((course) => {
     const text = [course.nombre, course.descripcion_corta, course.descripcion_completa, course.categoria, course.campana_area].join(' ').toLowerCase();
@@ -405,6 +406,16 @@ function renderPublicCatalog() {
       </div>
     </article>
   `).join('') : '<div class="public-empty"><i class="fa-solid fa-book-open"></i><strong>No encontramos cursos</strong><span>Prueba con otra busqueda o categoria.</span></div>';
+}
+
+function syncPublicHeroSearch() {
+  const heroSearch = document.getElementById('publicHeroSearch');
+  const headerSearch = document.getElementById('publicCourseSearch');
+  headerSearch.value = heroSearch.value;
+  renderPublicCatalog();
+  if (heroSearch.value.trim()) {
+    document.getElementById('publicCourses').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function promptPublicLogin(courseId) {

@@ -4,18 +4,17 @@
       <img class="brand-logo" src="https://drive.google.com/thumbnail?id=1psVpvO0Rhq8JyKfxUDem6dxzm7Qeci1R&sz=w1200" alt="IA Learning Solutions" onerror="this.style.display='none'">
       <span>IA Learning Solutions</span>
     </a>
+    <label class="public-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input id="publicCourseSearch" type="search" placeholder="Que quieres aprender?" aria-label="Buscar cursos">
+    </label>
     <nav id="publicNav" class="public-nav" aria-label="Catalogo">
       <a href="#publicCourses">Cursos</a>
+      <a href="#publicBenefits">Empresas</a>
+      <a href="#publicCourses">Rutas</a>
       <a href="#publicBenefits">Beneficios</a>
-      <a href="#publicCourses">Para empresas</a>
     </nav>
-    <div class="public-actions">
-      <label class="public-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input id="publicCourseSearch" type="search" placeholder="Que quieres aprender hoy" aria-label="Buscar cursos">
-      </label>
-      <button id="openPublicLogin" class="btn btn-public-login" type="button">Iniciar sesion</button>
-    </div>
+    <button id="openPublicLogin" class="btn btn-public-login" type="button">Acceder</button>
   </header>
 
   <main class="public-catalog-main">
@@ -24,6 +23,14 @@
         <span id="publicHeroTopLabel" class="public-kicker"></span>
         <h1 id="publicHeroTitle"></h1>
         <p id="publicHeroDescription"></p>
+        <div class="public-hero-search-wrap">
+          <strong>Que quieres aprender?</strong>
+          <label class="public-hero-search">
+            <input id="publicHeroSearch" type="search" aria-label="Buscar cursos desde portada">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </label>
+          <small>Explora cursos corporativos de IA, productividad y experiencia del cliente.</small>
+        </div>
         <div id="publicHeroActions" class="public-hero-actions">
         </div>
       </div>
