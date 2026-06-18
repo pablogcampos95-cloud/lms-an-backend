@@ -889,21 +889,12 @@
 
   .public-catalog-screen,
   .app-shell {
-    width: 125%;
-    min-height: 125vh;
-    zoom: .8;
+    width: 100%;
+    min-height: 100vh;
     background:
       radial-gradient(circle at 100% 0%, rgba(35,242,163,.09), transparent 32%),
       radial-gradient(circle at 0% 100%, rgba(0,216,255,.08), transparent 30%),
       linear-gradient(180deg, #050b14 0%, #040a12 100%);
-  }
-
-  @supports not (zoom: 1) {
-    .public-catalog-screen,
-    .app-shell {
-      transform: scale(.8);
-      transform-origin: top left;
-    }
   }
 
   .public-catalog-header,
@@ -1412,6 +1403,68 @@
 
     .public-hero-search {
       min-height: 58px;
+    }
+  }
+
+  /* Final public landing proportions: no browser zoom hacks. */
+  .public-catalog-screen {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .public-catalog-header {
+    grid-template-columns: minmax(190px, auto) minmax(260px, 520px) 1fr auto;
+    min-height: 82px;
+    padding: 14px clamp(20px, 3.2vw, 46px);
+    gap: clamp(18px, 2.2vw, 34px);
+  }
+
+  .public-catalog-main {
+    width: min(100%, 1500px);
+    padding: 0 clamp(18px, 3vw, 44px) 72px;
+  }
+
+  .public-hero {
+    min-height: clamp(470px, 50vw, 620px);
+    width: 100%;
+    max-width: 1320px;
+    margin: 0 auto 34px;
+    padding: clamp(52px, 7vw, 82px) 24px;
+  }
+
+  .public-hero > div {
+    width: min(720px, 100%);
+  }
+
+  .public-hero h1 {
+    max-width: 700px;
+    font-size: clamp(3.15rem, 5.05vw, 5.35rem);
+  }
+
+  .public-hero p {
+    margin-bottom: 24px;
+  }
+
+  .public-benefits {
+    max-width: 1320px;
+    margin-top: 0;
+  }
+
+  @media (max-width: 1100px) {
+    .public-catalog-header {
+      grid-template-columns: auto 1fr auto;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .public-catalog-header {
+      grid-template-columns: 1fr auto;
+    }
+
+    .public-hero {
+      min-height: auto;
+      padding: 50px 16px;
     }
   }
 </style>
