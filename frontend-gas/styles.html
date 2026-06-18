@@ -866,4 +866,282 @@
     .evaluation-page-heading,.evaluation-filters{align-items:stretch;flex-direction:column}.evaluation-filters .form-select{max-width:none}.evaluation-metrics{grid-template-columns:1fr}.evaluation-admin-card{align-items:flex-start;flex-direction:column}.journey-activity{flex-direction:column}
     .forum-workspace-header,.forum-comment-head{align-items:flex-start;flex-direction:column}.forum-grade-fields{grid-template-columns:1fr}.forum-grade-fields .btn{width:100%}
   }
+  /* IA Learning visual refresh published build */
+  :root {
+    --bg: #050b14;
+    --bg-deep: #02060d;
+    --panel: rgba(14, 20, 31, 0.94);
+    --panel-2: #111923;
+    --line: rgba(0, 216, 255, 0.16);
+    --line-strong: rgba(0, 216, 255, 0.34);
+    --turquoise: #23f7c8;
+    --mint: #24f2a3;
+    --gradient: linear-gradient(135deg, #23f7c8 0%, #00d8ff 48%, #1f6bff 100%);
+    --shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 84% -6%, rgba(35, 242, 163, 0.16), transparent 30%),
+      radial-gradient(circle at 16% 88%, rgba(0, 216, 255, 0.09), transparent 32%),
+      linear-gradient(180deg, #07101b 0%, var(--bg) 40%, #03070d 100%);
+  }
+
+  .public-catalog-screen,
+  .app-shell {
+    background:
+      radial-gradient(circle at 100% 0%, rgba(35,242,163,.09), transparent 32%),
+      radial-gradient(circle at 0% 100%, rgba(0,216,255,.08), transparent 30%),
+      linear-gradient(180deg, #050b14 0%, #040a12 100%);
+  }
+
+  .public-catalog-header,
+  .sidebar,
+  .topbar,
+  .app-footer {
+    background: rgba(3, 8, 15, .78);
+    backdrop-filter: blur(18px);
+  }
+
+  .content-wrap,
+  .public-catalog-main {
+    max-width: 1480px;
+    margin-inline: auto;
+  }
+
+  .public-hero,
+  .learning-hero {
+    min-height: clamp(420px, 42vw, 560px);
+    border-color: rgba(35,242,163,.26);
+    border-radius: 30px;
+    background:
+      radial-gradient(circle at 82% 36%, rgba(35,242,163,.13), transparent 29%),
+      radial-gradient(circle at 58% 0%, rgba(0,216,255,.08), transparent 35%),
+      linear-gradient(115deg, rgba(7,16,28,.98), rgba(9,20,36,.96) 52%, rgba(4,10,17,.98)) !important;
+    box-shadow: 0 34px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.035);
+  }
+
+  .learning-hero.has-course-cover {
+    background-size: cover !important;
+    background-position: center center !important;
+  }
+
+  .public-hero h1,
+  .learning-hero h1 {
+    max-width: 860px;
+    font-size: clamp(2.45rem, 5.15vw, 5.3rem);
+    line-height: .98;
+    letter-spacing: -.065em;
+  }
+
+  .public-hero p,
+  .learning-hero p {
+    max-width: 700px;
+    color: #c8d4df;
+    font-size: clamp(1rem, 1.3vw, 1.2rem);
+  }
+
+  .hero-badge-primary,
+  .btn-gold,
+  .student-course-primary,
+  .achievement-button,
+  .evaluation-tabs button.active {
+    color: #02110f !important;
+    background: linear-gradient(135deg, var(--mint), var(--cyan), var(--electric)) !important;
+    box-shadow: 0 16px 38px rgba(0,216,255,.22);
+  }
+
+  .data-panel,
+  .profile-progress-card,
+  .achievement-card,
+  .current-plan-card,
+  .student-courses-heading,
+  .page-intro,
+  .evaluation-page-heading,
+  .forum-workspace,
+  .integrated-forum,
+  .public-category-card {
+    border-color: rgba(0,216,255,.18);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(35,242,163,.08), transparent 32%),
+      linear-gradient(135deg, rgba(13,24,38,.94), rgba(7,15,26,.94));
+  }
+
+  .public-course-grid,
+  .course-showcase-grid,
+  .student-courses-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .public-course-card,
+  .visual-course-card,
+  .student-catalog-card {
+    border-radius: 18px;
+    background: #101720;
+    box-shadow: 0 22px 54px rgba(0,0,0,.34);
+  }
+
+  .public-course-card:hover,
+  .visual-course-card:hover,
+  .student-catalog-card:hover,
+  .recommendation-strip article:hover,
+  .learning-path-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(35,242,163,.48);
+    box-shadow: 0 30px 70px rgba(0,0,0,.42), 0 0 28px rgba(35,242,163,.08);
+  }
+
+  .public-course-cover,
+  .course-image,
+  .student-catalog-cover {
+    height: clamp(180px, 17vw, 250px);
+    background:
+      radial-gradient(circle at 50% 18%, rgba(35,242,163,.16), transparent 36%),
+      linear-gradient(145deg, #151b27, #080e16);
+  }
+
+  .public-course-cover img,
+  .course-image img,
+  .student-catalog-cover img,
+  .student-course-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+  }
+
+  .course-card-body,
+  .student-catalog-body,
+  .public-course-body {
+    background: linear-gradient(180deg, rgba(18,27,39,.98), rgba(12,20,30,.98));
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+
+  .student-catalog-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 315px;
+  }
+
+  .student-catalog-body h2,
+  .course-card-body h3,
+  .public-course-body h3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  .course-category,
+  .course-progress-copy strong,
+  .student-course-progress-copy strong,
+  .path-progress > strong,
+  .evaluation-metrics strong,
+  .student-courses-summary strong {
+    color: var(--mint);
+  }
+
+  .recommendation-strip article,
+  .learning-path-card {
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, rgba(17,25,35,.98) 0 68%, rgba(21,31,42,.98) 68% 100%);
+  }
+
+  .recommendation-icon,
+  .evaluation-card-icon,
+  .evaluation-type-icon,
+  .page-intro-icon,
+  .certificate-icon {
+    color: var(--mint);
+    background: rgba(35,242,163,.1);
+    border: 1px solid rgba(35,242,163,.18);
+  }
+
+  .student-player-layout {
+    min-height: clamp(620px, 78vh, 920px);
+  }
+
+  .student-player-sidebar {
+    background: linear-gradient(180deg, rgba(7,17,31,.98), rgba(4,10,17,.98));
+  }
+
+  .student-player-content {
+    background:
+      radial-gradient(circle at 100% 0%, rgba(35,242,163,.08), transparent 30%),
+      linear-gradient(145deg, #07111d, #040a12);
+  }
+
+  .student-player-content .lesson-content {
+    min-height: clamp(420px, 58vh, 720px);
+    max-width: 100%;
+    overflow: auto;
+    overflow-wrap: anywhere;
+    border-color: rgba(0,216,255,.18);
+    background: rgba(6,13,22,.92);
+  }
+
+  .responsive-embed,
+  .embed-preview {
+    width: 100%;
+    max-width: 100%;
+    min-height: min(78vh, 760px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .lesson-content iframe,
+  .responsive-embed iframe,
+  .embed-preview iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: min(78vh, 760px);
+    height: min(78vh, 760px) !important;
+    border-radius: 16px;
+  }
+
+  .lesson-content :where(img, video) {
+    display: block;
+    margin-inline: auto;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .ai-assistant-launcher {
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    box-shadow: 0 18px 46px rgba(35,242,163,.22), 0 0 0 1px rgba(255,255,255,.08) inset;
+  }
+
+  @media (max-width: 900px) {
+    .public-hero h1,
+    .learning-hero h1 {
+      font-size: clamp(2.25rem, 8vw, 4rem);
+    }
+
+    .student-player-sidebar {
+      max-height: 360px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .public-hero h1,
+    .learning-hero h1 {
+      font-size: clamp(2.05rem, 11vw, 2.9rem);
+    }
+
+    .responsive-embed,
+    .embed-preview {
+      padding: 8px;
+    }
+
+    .lesson-content iframe,
+    .responsive-embed iframe,
+    .embed-preview iframe {
+      min-height: 520px;
+      height: 520px !important;
+    }
+  }
 </style>
