@@ -520,8 +520,8 @@
   .student-player-layout { position: relative; display: grid; grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); min-height: 560px; }
   .student-player-layout.outline-collapsed { grid-template-columns: minmax(0, 1fr); }
   .student-player-layout.outline-collapsed .student-player-sidebar { display: none; }
-  .student-player-layout.outline-open { grid-template-columns: minmax(0, 1fr); }
-  .student-player-layout.outline-open .student-player-sidebar { position: absolute; inset: 0 auto 0 0; z-index: 6; width: min(370px, 88vw); box-shadow: 28px 0 70px rgba(0,0,0,.55); border-right: 1px solid var(--line-strong); }
+  .student-player-layout.outline-open { grid-template-columns: minmax(260px, 345px) minmax(0, 1fr); }
+  .student-player-layout.outline-open .student-player-sidebar { display: block; }
   .student-player-sidebar { padding: 20px 14px; overflow-y: auto; border-right: 1px solid var(--line); background: #061832; }
   .student-player-sidebar-title { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px 18px;color:var(--text);font-weight:700; }
   .student-player-sidebar-title button { width:34px;height:34px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03); }
@@ -1146,19 +1146,19 @@
   }
 
   #view-student-course-player .student-player-layout.outline-open {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(260px, 345px) minmax(0, 1fr);
   }
 
   #view-student-course-player .student-player-layout.outline-open .student-player-sidebar {
     display: block;
-    position: absolute;
-    inset: 0 auto 0 0;
-    z-index: 6;
-    width: min(370px, 88vw);
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    width: auto;
     max-height: none;
     border-right: 1px solid var(--line-strong);
     border-bottom: 0;
-    box-shadow: 28px 0 70px rgba(0,0,0,.55);
+    box-shadow: none;
   }
 
   .responsive-embed,
