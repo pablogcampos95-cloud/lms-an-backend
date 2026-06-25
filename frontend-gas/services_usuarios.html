@@ -21,6 +21,13 @@ const UsuariosService = {
     return result.data;
   },
 
+  async resetPassword(id) {
+    const result = await ApiService.request(`/api/usuarios/${id}/reset-password`, {
+      method: 'PUT',
+    });
+    return result.data;
+  },
+
   async eliminar(id) {
     const result = await ApiService.request(`/api/usuarios/${id}`, {
       method: 'DELETE',

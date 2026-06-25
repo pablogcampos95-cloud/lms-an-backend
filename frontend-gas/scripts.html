@@ -1320,6 +1320,7 @@ function renderUsersTable() {
       <td><span class="badge ${user.tipo_plan === 'Pagado' ? 'plan-badge-paid' : 'badge-soft'}">${escapeHtml(user.tipo_plan || 'Gratuito')}</span></td>
       <td class="text-end">
         <button class="btn btn-outline-light btn-sm me-1" type="button" onclick="openEditUserModal(${user.id})"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-outline-warning btn-sm me-1" type="button" title="Resetear contrasena a 1234" onclick="confirmResetUserPassword(${user.id})"><i class="fa-solid fa-key"></i></button>
         <button class="btn btn-outline-danger btn-sm" type="button" onclick="confirmDeleteUser(${user.id})"><i class="fa-solid fa-trash"></i></button>
       </td>
     </tr>
@@ -1400,6 +1401,32 @@ async function handleSaveUser(event) {
     Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title: 'Usuario guardado' });
   } catch (error) {
     Swal.fire('No se pudo guardar', error.message, 'error');
+  }
+}
+
+async function confirmResetUserPassword(id) {
+  const user = AppState.usuarios.find((item) => item.id === id);
+  const result = await Swal.fire({
+    title: 'Resetear contrasena',
+    text: `La contrasena de ${user ? (user.Nombres || user.usuario) : 'este usuario'} quedara como 1234.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Resetear a 1234',
+    cancelButtonText: 'Cancelar',
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    await UsuariosService.resetPassword(id);
+    await loadUsers();
+    Swal.fire({
+      icon: 'success',
+      title: 'Contrasena reseteada',
+      text: 'La nueva contrasena temporal es 1234.',
+    });
+  } catch (error) {
+    Swal.fire('No se pudo resetear', error.message, 'error');
   }
 }
 

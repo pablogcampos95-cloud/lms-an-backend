@@ -124,6 +124,26 @@ const updateUsuario = async (id, usuario) => {
   return sanitizeUsuario(data);
 };
 
+const resetPassword = async (id, password = '1234') => {
+  const password_hash = await bcrypt.hash(password, 10);
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ password_hash })
+    .eq('id', id)
+    .select(USUARIO_SELECT)
+    .maybeSingle();
+
+  const appError = normalizeSupabaseError(error);
+  if (appError) throw appError;
+
+  if (!data) {
+    throw new AppError('Usuario no encontrado', 404);
+  }
+
+  return sanitizeUsuario(data);
+};
+
 const deleteUsuario = async (id) => {
   const usuario = await getUsuarioById(id);
 
@@ -145,5 +165,6 @@ module.exports = {
   getUsuarioWithPasswordById,
   createUsuario,
   updateUsuario,
+  resetPassword,
   deleteUsuario,
 };

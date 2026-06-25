@@ -20,6 +20,7 @@ router.get('/:id/asignaciones', authorizeRoles('Administrador'), validateUsuario
 router.post('/', authorizeRoles('Administrador'), validateCreateUsuario, asyncHandler(usuariosController.crearUsuario));
 router.put('/:id', authorizeRoles('Administrador'), validateUsuarioId, validateUpdateUsuario, asyncHandler(usuariosController.actualizarUsuario));
 router.put('/:id/asignaciones', authorizeRoles('Administrador'), validateUsuarioId, asyncHandler(usuariosController.guardarAsignaciones));
+router.put('/:id/reset-password', authorizeRoles('Administrador'), validateUsuarioId, asyncHandler(usuariosController.resetearPassword));
 router.delete('/:id', authorizeRoles('Administrador'), validateUsuarioId, asyncHandler(usuariosController.eliminarUsuario));
 
 module.exports = router;

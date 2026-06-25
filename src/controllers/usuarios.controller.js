@@ -39,6 +39,16 @@ const actualizarUsuario = async (req, res) => {
   });
 };
 
+const resetearPassword = async (req, res) => {
+  const usuario = await usuariosService.resetPassword(req.params.id, '1234');
+
+  res.json({
+    ok: true,
+    message: 'Contrasena reseteada a 1234',
+    data: usuario,
+  });
+};
+
 const eliminarUsuario = async (req, res) => {
   const usuario = await usuariosService.deleteUsuario(req.params.id);
 
@@ -63,6 +73,7 @@ module.exports = {
   obtenerUsuario,
   crearUsuario,
   actualizarUsuario,
+  resetearPassword,
   eliminarUsuario,
   obtenerAsignaciones,
   guardarAsignaciones,
