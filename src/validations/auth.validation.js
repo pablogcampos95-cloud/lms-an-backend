@@ -18,7 +18,7 @@ const validateLogin = (req, res, next) => {
 
   req.body = {
     usuario: usuario.trim(),
-    password,
+    password: password.trim(),
     rememberMe: rememberMe === true,
   };
 

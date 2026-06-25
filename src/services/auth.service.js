@@ -5,22 +5,43 @@ const supabase = require('./supabase.service');
 const usuariosService = require('./usuarios.service');
 const AppError = require('../utils/AppError');
 
-const login = async ({ usuario, password, rememberMe = false }) => {
-  const { data, error } = await supabase
+const getUserByCredential = async (credential) => {
+  const loginValue = credential.trim();
+
+  let { data, error } = await supabase
     .from('usuarios')
     .select('*, rol:roles(id,nombre,descripcion)')
-    .eq('usuario', usuario)
+    .ilike('usuario', loginValue)
     .maybeSingle();
 
   if (error) {
     throw new AppError('Error al consultar credenciales', 500, error.message);
   }
 
+  if (data || !loginValue.includes('@')) return data;
+
+  ({ data, error } = await supabase
+    .from('usuarios')
+    .select('*, rol:roles(id,nombre,descripcion)')
+    .ilike('Correo', loginValue)
+    .maybeSingle());
+
+  if (error) {
+    throw new AppError('Error al consultar credenciales', 500, error.message);
+  }
+
+  return data;
+};
+
+const login = async ({ usuario, password, rememberMe = false }) => {
+  const data = await getUserByCredential(usuario);
+  const cleanPassword = typeof password === 'string' ? password.trim() : password;
+
   if (!data || !data.password_hash) {
     throw new AppError('Usuario o contrasena incorrectos', 401);
   }
 
-  const passwordValida = await bcrypt.compare(password, data.password_hash);
+  const passwordValida = await bcrypt.compare(cleanPassword, data.password_hash);
 
   if (!passwordValida) {
     throw new AppError('Usuario o contrasena incorrectos', 401);
