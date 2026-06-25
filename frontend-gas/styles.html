@@ -631,6 +631,18 @@
   .table thead th { padding-top: 14px; padding-bottom: 14px; border-bottom-color: var(--line-strong); }
   .table tbody tr { transition: background 150ms ease; }
   .table tbody tr:hover { background: rgba(37,217,232,0.045); }
+  .user-actions-dropdown { display:inline-flex; }
+  .user-actions-button { width:36px;height:36px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.03); }
+  .user-actions-button:hover,
+  .user-actions-button[aria-expanded="true"] { color:var(--cyan);border-color:var(--cyan);background:rgba(0,216,255,.08); }
+  .user-actions-menu { min-width:190px;padding:8px;border:1px solid var(--line-strong);border-radius:15px;background:rgba(5,13,28,.98);box-shadow:0 18px 46px rgba(0,0,0,.45);backdrop-filter:blur(16px); }
+  .user-actions-item { display:flex;align-items:center;gap:10px;padding:10px 12px;color:#dcecff;border-radius:10px; }
+  .user-actions-item:hover,
+  .user-actions-item:focus { color:var(--text);background:rgba(0,216,255,.09); }
+  .user-actions-item i { width:18px;color:var(--cyan);text-align:center; }
+  .user-actions-item.danger { color:#ffbdc6; }
+  .user-actions-item.danger i { color:#ff5c75; }
+  .user-actions-menu .dropdown-divider { border-color:var(--line); }
 
   .app-footer {
     min-height: 62px;

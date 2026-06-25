@@ -1319,9 +1319,17 @@ function renderUsersTable() {
       <td>${escapeHtml(user.rol ? user.rol.nombre : '')}</td>
       <td><span class="badge ${user.tipo_plan === 'Pagado' ? 'plan-badge-paid' : 'badge-soft'}">${escapeHtml(user.tipo_plan || 'Gratuito')}</span></td>
       <td class="text-end">
-        <button class="btn btn-outline-light btn-sm me-1" type="button" onclick="openEditUserModal(${user.id})"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-outline-warning btn-sm me-1" type="button" title="Resetear contrasena a 1234" onclick="confirmResetUserPassword(${user.id})"><i class="fa-solid fa-key"></i></button>
-        <button class="btn btn-outline-danger btn-sm" type="button" onclick="confirmDeleteUser(${user.id})"><i class="fa-solid fa-trash"></i></button>
+        <div class="dropdown user-actions-dropdown">
+          <button class="btn user-actions-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Acciones de ${escapeHtml(user.Nombres || user.usuario || 'usuario')}">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end user-actions-menu">
+            <button class="dropdown-item user-actions-item" type="button" onclick="openEditUserModal(${user.id})"><i class="fa-solid fa-pen"></i><span>Editar</span></button>
+            <button class="dropdown-item user-actions-item" type="button" onclick="confirmResetUserPassword(${user.id})"><i class="fa-solid fa-key"></i><span>Resetear clave</span></button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item user-actions-item danger" type="button" onclick="confirmDeleteUser(${user.id})"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button>
+          </div>
+        </div>
       </td>
     </tr>
   `).join('');
