@@ -6,12 +6,18 @@ const AppError = require('../utils/AppError');
 
 const ESTADOS = ['Borrador', 'Publicado', 'Inactivo'];
 const TIPOS_CONTENIDO = ['Texto', 'URL', 'HTML', 'Archivo', 'Video', 'Evaluacion'];
+const PUBLIC_COURSE_FIELDS = 'id,nombre,descripcion_corta,descripcion_completa,imagen_portada_url,categoria,campana_area,duracion_estimada_min,es_gratis,estado,created_at,modulos(count)';
 
 const throwSupabaseError = (error, message = 'Error al consultar Supabase') => {
   if (!error) return;
   if (error.code === '23505') throw new AppError('El orden indicado ya esta ocupado', 409, error.message);
   if (error.code === '23503') throw new AppError('La operacion referencia un registro inexistente', 400, error.message);
   throw new AppError(message, 500, error.message);
+};
+
+const isMissingColumnError = (error, column) => {
+  const message = [error && error.message, error && error.details].filter(Boolean).join(' ');
+  return new RegExp(`Could not find the '${column}' column|column (?:\\w+\\.)?"?${column}"? does not exist|schema cache`, 'i').test(message);
 };
 
 const assertEstado = (estado) => {
@@ -65,12 +71,24 @@ const listCursos = async ({ estado, categoria, search } = {}) => {
 const listPublicCourses = async ({ categoria, search } = {}) => {
   let query = supabase
     .from('cursos')
-    .select('id,nombre,descripcion_corta,descripcion_completa,imagen_portada_url,categoria,campana_area,duracion_estimada_min,estado,created_at,modulos(count)')
+    .select(PUBLIC_COURSE_FIELDS)
     .eq('estado', 'Publicado')
     .order('created_at', { ascending: false });
   if (categoria) query = query.eq('categoria', categoria);
   if (search) query = query.ilike('nombre', `%${search}%`);
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (isMissingColumnError(error, 'es_gratis')) {
+    let fallbackQuery = supabase
+      .from('cursos')
+      .select(PUBLIC_COURSE_FIELDS.replace(',es_gratis', ''))
+      .eq('estado', 'Publicado')
+      .order('created_at', { ascending: false });
+    if (categoria) fallbackQuery = fallbackQuery.eq('categoria', categoria);
+    if (search) fallbackQuery = fallbackQuery.ilike('nombre', `%${search}%`);
+    const fallback = await fallbackQuery;
+    data = (fallback.data || []).map((curso) => ({ ...curso, es_gratis: false }));
+    error = fallback.error;
+  }
   throwSupabaseError(error);
   return data.map((curso) => ({
     ...curso,
@@ -167,23 +185,50 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
 const createCurso = async (payload, userId) => {
   assertEstado(payload.estado);
   if (!payload.nombre || !payload.nombre.trim()) throw new AppError('El nombre del curso es obligatorio', 400);
+  const cursoPayload = { ...payload, es_gratis: payload.es_gratis === true };
   const { data, error } = await supabase
     .from('cursos')
-    .insert({ ...payload, nombre: payload.nombre.trim(), creado_por: userId })
+    .insert({ ...cursoPayload, nombre: payload.nombre.trim(), creado_por: userId })
     .select('*')
     .single();
+  if (isMissingColumnError(error, 'es_gratis')) {
+    const { es_gratis, ...fallbackPayload } = cursoPayload;
+    const fallback = await supabase
+      .from('cursos')
+      .insert({ ...fallbackPayload, nombre: payload.nombre.trim(), creado_por: userId })
+      .select('*')
+      .single();
+    throwSupabaseError(fallback.error);
+    return { ...fallback.data, es_gratis: false };
+  }
   throwSupabaseError(error);
   return data;
 };
 
 const updateCurso = async (id, payload) => {
   assertEstado(payload.estado);
+  const cursoPayload = { ...payload };
+  if (Object.prototype.hasOwnProperty.call(cursoPayload, 'es_gratis')) {
+    cursoPayload.es_gratis = cursoPayload.es_gratis === true;
+  }
   const { data, error } = await supabase
     .from('cursos')
-    .update({ ...payload, updated_at: new Date().toISOString() })
+    .update({ ...cursoPayload, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select('*')
     .maybeSingle();
+  if (isMissingColumnError(error, 'es_gratis')) {
+    const { es_gratis, ...fallbackPayload } = cursoPayload;
+    const fallback = await supabase
+      .from('cursos')
+      .update({ ...fallbackPayload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    throwSupabaseError(fallback.error);
+    if (!fallback.data) throw new AppError('Curso no encontrado', 404);
+    return { ...fallback.data, es_gratis: false };
+  }
   throwSupabaseError(error);
   if (!data) throw new AppError('Curso no encontrado', 404);
   return data;

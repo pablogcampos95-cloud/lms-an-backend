@@ -212,6 +212,8 @@
   .public-course-meta { display:flex;gap:14px;color:#91a8c4;font-size:.78rem;margin:18px 0; }
   .public-course-meta i { color:var(--cyan);margin-right:6px; }
   .public-course-button { width:100%;color:#031326;background:var(--gradient);border:0;font-weight:900; }
+  .public-course-button-secondary { color:#d8e8ff;background:rgba(5,24,50,.72);border:1px solid var(--line-strong); }
+  .public-course-button-secondary:hover { color:#031326;background:var(--cyan); }
   .public-empty,.public-loading { grid-column:1/-1;display:grid;place-items:center;gap:10px;min-height:160px;border:1px dashed var(--line-strong);border-radius:24px;color:var(--muted);text-align:center; }
   .public-empty i { color:var(--cyan);font-size:2rem; }
   .public-register-modal { border:1px solid var(--line-strong);border-radius:24px;background:linear-gradient(155deg,rgba(9,26,55,.98),rgba(2,10,26,.98));color:var(--text);box-shadow:var(--shadow); }
@@ -546,6 +548,10 @@
   .student-player-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }.preview-mode-label { color: var(--muted); font-size: .78rem; }.preview-mode-label i { color: var(--cyan); }
   .course-students-list { display: grid; gap: 10px; max-height: 430px; margin-bottom: 12px; overflow-y: auto; }
   .course-student-option { display: grid; grid-template-columns: auto 42px 1fr; align-items: center; gap: 12px; padding: 13px 15px; cursor: pointer; border: 1px solid var(--line); border-radius: 14px; background: rgba(5,24,50,.72); }.course-student-option:hover { border-color: var(--line-strong); }.course-student-avatar { display: grid; place-items: center; width: 40px; height: 40px; color: var(--cyan); border-radius: 12px; background: rgba(35,224,199,.12); }.course-student-option strong, .course-student-option small { display: block; }.course-student-option small { color: var(--muted); }
+  .course-free-switch { display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(0,216,255,.06); }
+  .course-free-switch .form-check-input { flex:0 0 auto;margin-left:0;margin-top:4px; }
+  .course-free-switch label { display:grid;gap:3px;margin:0; }
+  .course-free-switch span { color:var(--muted);font-size:.82rem;line-height:1.4; }
 
   .modal-content,
   .modal-content.bg-dark {

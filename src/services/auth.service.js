@@ -89,18 +89,35 @@ const uniqueUsername = async (baseValue) => {
   return `${base.slice(0, 32)}_${crypto.randomBytes(3).toString('hex')}`;
 };
 
-const ensureCourseAssignment = async (usuarioId, cursoId) => {
+const validateFreeCourse = async (cursoId) => {
   const id = Number(cursoId);
-  if (!Number.isInteger(id) || id <= 0) return;
+  if (!Number.isInteger(id) || id <= 0) return null;
 
-  const { data: course, error: courseError } = await supabase
+  let { data: course, error: courseError } = await supabase
     .from('cursos')
-    .select('id,estado')
+    .select('id,estado,es_gratis')
     .eq('id', id)
     .maybeSingle();
 
+  if (courseError && /es_gratis|schema cache|Could not find/i.test([courseError.message, courseError.details].filter(Boolean).join(' '))) {
+    const fallback = await supabase
+      .from('cursos')
+      .select('id,estado')
+      .eq('id', id)
+      .maybeSingle();
+    course = fallback.data ? { ...fallback.data, es_gratis: false } : fallback.data;
+    courseError = fallback.error;
+  }
+
   if (courseError) throw new AppError('Error al validar curso', 500, courseError.message);
-  if (!course || course.estado !== 'Publicado') return;
+  if (!course || course.estado !== 'Publicado') throw new AppError('Este curso no esta disponible para registro gratuito', 403);
+  if (course.es_gratis !== true) throw new AppError('Este curso no es gratuito. Inicia sesion o solicita asignacion al administrador.', 403);
+  return id;
+};
+
+const ensureCourseAssignment = async (usuarioId, cursoId) => {
+  const id = await validateFreeCourse(cursoId);
+  if (!id) return;
 
   const { error } = await supabase
     .from('curso_asignaciones')
@@ -120,6 +137,7 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, cu
 
   const existing = await getUserByCredential(cleanEmail);
   if (existing) throw new AppError('Ya existe una cuenta con ese correo. Inicia sesion para continuar.', 409);
+  await validateFreeCourse(cursoId);
 
   const rolId = await getStudentRoleId();
   const username = await uniqueUsername(usuario || cleanEmail.split('@')[0]);
@@ -188,6 +206,7 @@ const verifyGoogleCredential = async (credential) => {
 const loginWithGoogle = async ({ credential, curso_id: cursoId, rememberMe = true }) => {
   const profile = await verifyGoogleCredential(credential);
   const email = String(profile.email || '').trim().toLowerCase();
+  await validateFreeCourse(cursoId);
   let user = await getUserByCredential(email);
 
   if (!user) {

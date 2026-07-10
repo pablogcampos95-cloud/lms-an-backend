@@ -193,6 +193,8 @@ function showPublicCatalog() {
 
 function scrollToFreeCourses() {
   const target = document.getElementById('publicCourses');
+  if (target) target.dataset.freeOnly = 'true';
+  renderPublicCatalog();
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -447,6 +449,10 @@ function handlePublicAction(url) {
   if (!url || url === '#login') return showLogin();
   if (url.startsWith('#')) {
     const target = document.querySelector(url);
+    if (url === '#publicCourses' && target) {
+      target.dataset.freeOnly = 'false';
+      renderPublicCatalog();
+    }
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
@@ -479,15 +485,16 @@ function renderPublicCatalog() {
   const grid = document.getElementById('publicCoursesGrid');
   const search = (document.getElementById('publicCourseSearch').value || document.getElementById('publicHeroSearch').value || '').trim().toLowerCase();
   const category = document.getElementById('publicCategoryFilter').value;
+  const onlyFree = document.getElementById('publicCourses').dataset.freeOnly === 'true';
   const courses = AppState.publicCourses.filter((course) => {
     const text = [course.nombre, course.descripcion_corta, course.descripcion_completa, course.categoria, course.campana_area].join(' ').toLowerCase();
-    return (!search || text.includes(search)) && (!category || course.categoria === category);
+    return (!onlyFree || course.es_gratis === true) && (!search || text.includes(search)) && (!category || course.categoria === category);
   });
   grid.innerHTML = courses.length ? courses.map((course) => `
     <article class="public-course-card">
       <div class="public-course-cover">
         ${course.imagen_portada_url ? `<img src="${escapeHtml(course.imagen_portada_url)}" alt="Portada de ${escapeHtml(course.nombre)}">` : '<div class="public-course-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>'}
-        <span>Curso disponible</span>
+        <span>${course.es_gratis === true ? 'Curso gratis' : 'Curso disponible'}</span>
       </div>
       <div class="public-course-body">
         <span class="public-course-category">${escapeHtml(course.categoria || 'Curso corporativo')}</span>
@@ -497,12 +504,12 @@ function renderPublicCatalog() {
           <span><i class="fa-regular fa-clock"></i>${course.duracion_estimada_min || 0} min</span>
           <span><i class="fa-solid fa-layer-group"></i>${course.cantidad_modulos || 0} modulos</span>
         </div>
-        <button class="btn public-course-button" type="button" onclick="promptPublicLogin(${Number(course.id)})">
-          <i class="fa-solid fa-gift me-2"></i>Acceder gratis
+        <button class="btn public-course-button ${course.es_gratis === true ? '' : 'public-course-button-secondary'}" type="button" onclick="${course.es_gratis === true ? `promptPublicLogin(${Number(course.id)})` : `promptPaidCourse(${Number(course.id)})`}">
+          <i class="fa-solid ${course.es_gratis === true ? 'fa-gift' : 'fa-lock'} me-2"></i>${course.es_gratis === true ? 'Acceder gratis' : 'Iniciar sesion'}
         </button>
       </div>
     </article>
-  `).join('') : '<div class="public-empty"><i class="fa-solid fa-book-open"></i><strong>No encontramos cursos</strong><span>Prueba con otra busqueda o categoria.</span></div>';
+  `).join('') : `<div class="public-empty"><i class="fa-solid fa-book-open"></i><strong>No encontramos cursos${onlyFree ? ' gratis' : ''}</strong><span>${onlyFree ? 'El administrador aun no ha marcado cursos como gratuitos.' : 'Prueba con otra busqueda o categoria.'}</span></div>`;
 }
 
 function syncPublicHeroSearch() {
@@ -530,6 +537,20 @@ function promptPublicLogin(courseId) {
   }).then((result) => {
     if (result.isConfirmed) openPublicRegister(courseId);
     if (result.isDenied) showLogin();
+  });
+}
+
+function promptPaidCourse(courseId) {
+  const course = AppState.publicCourses.find((item) => Number(item.id) === Number(courseId));
+  Swal.fire({
+    icon: 'info',
+    title: 'Curso con acceso asignado',
+    text: course && course.nombre ? `"${course.nombre}" no esta marcado como gratuito. Inicia sesion con una cuenta asignada para verlo.` : 'Este curso requiere una cuenta asignada para verlo.',
+    confirmButtonText: 'Iniciar sesion',
+    showCancelButton: true,
+    cancelButtonText: 'Seguir explorando',
+  }).then((result) => {
+    if (result.isConfirmed) showLogin();
   });
 }
 
@@ -1666,7 +1687,7 @@ function renderCoursesTable() {
   }
   tbody.innerHTML = courses.map((curso) => `
     <tr>
-      <td><div class="fw-semibold">${escapeHtml(curso.nombre)}</div><small class="text-secondary">${escapeHtml(curso.descripcion_corta || '')}</small></td>
+      <td><div class="fw-semibold">${escapeHtml(curso.nombre)} <span class="badge ${curso.es_gratis === true ? 'text-bg-info' : 'badge-soft'} ms-1">${curso.es_gratis === true ? 'Gratis' : 'No gratis'}</span></div><small class="text-secondary">${escapeHtml(curso.descripcion_corta || '')}</small></td>
       <td>${escapeHtml(curso.categoria || '-')}</td>
       <td>${curso.cantidad_modulos || 0}</td>
       <td><span class="badge ${courseStatusClass(curso.estado)}">${escapeHtml(curso.estado)}</span></td>
@@ -1698,6 +1719,7 @@ function openCreateCourseModal() {
   document.getElementById('courseForm').reset();
   document.getElementById('courseId').value = '';
   document.getElementById('courseStatus').value = 'Borrador';
+  document.getElementById('courseIsFree').checked = false;
   AppState.courseModal.show();
 }
 
@@ -1711,6 +1733,7 @@ function fillCourseForm(curso) {
   document.getElementById('courseArea').value = curso.campana_area || '';
   document.getElementById('courseDuration').value = curso.duracion_estimada_min || 0;
   document.getElementById('courseStatus').value = curso.estado || 'Borrador';
+  document.getElementById('courseIsFree').checked = curso.es_gratis === true;
 }
 
 async function openEditCourseModal(id) {
@@ -1731,6 +1754,7 @@ function getCoursePayload() {
     categoria: document.getElementById('courseCategory').value.trim(),
     campana_area: document.getElementById('courseArea').value.trim(),
     duracion_estimada_min: Number(document.getElementById('courseDuration').value || 0),
+    es_gratis: document.getElementById('courseIsFree').checked,
     estado: document.getElementById('courseStatus').value,
   };
 }
@@ -1766,7 +1790,7 @@ async function openCourseEditor(id) {
     document.getElementById('courseInfoSummary').innerHTML = `
       <div class="row g-4 align-items-center">
         ${AppState.cursoActual.imagen_portada_url ? `<div class="col-md-3"><img class="course-cover" src="${escapeHtml(AppState.cursoActual.imagen_portada_url)}" alt="Portada"></div>` : ''}
-        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge badge-soft">${escapeHtml(AppState.cursoActual.categoria || 'Sin categoria')}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${AppState.cursoActual.duracion_estimada_min || 0} minutos</small></div>
+        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge ${AppState.cursoActual.es_gratis === true ? 'text-bg-info' : 'badge-soft'}">${AppState.cursoActual.es_gratis === true ? 'Gratis' : 'No gratis'}</span><span class="badge badge-soft">${escapeHtml(AppState.cursoActual.categoria || 'Sin categoria')}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${AppState.cursoActual.duracion_estimada_min || 0} minutos</small></div>
       </div>`;
     renderModulesEditor();
   } catch (error) { Swal.fire('No se pudo cargar el curso', error.message, 'error'); }
@@ -1883,8 +1907,22 @@ async function deleteLesson(id) { if (!(await confirmAction('Eliminar paso', 'Se
 
 function previewEmbeddedHtml() { const preview = document.getElementById('embeddedHtmlPreview'); preview.innerHTML = document.getElementById('lessonHtml').value; preview.classList.remove('d-none'); }
 
-async function setCourseStatus(id, estado) { try { const curso = AppState.cursos.find((item) => item.id === id) || await CursosService.obtener(id); await CursosService.actualizar(id, { estado }); await loadCourses(); if (AppState.cursoActual && AppState.cursoActual.id === id) await openCourseEditor(id); toastSuccess(`Curso ${estado.toLowerCase()}`); } catch (error) { Swal.fire('No se pudo actualizar', error.message, 'error'); } }
-async function publishCurrentCourse() { if (AppState.cursoActual) await setCourseStatus(AppState.cursoActual.id, 'Publicado'); }
+async function setCourseStatus(id, estado, extra = {}) { try { const curso = AppState.cursos.find((item) => item.id === id) || await CursosService.obtener(id); await CursosService.actualizar(id, { estado, ...extra }); await loadCourses(); if (AppState.cursoActual && AppState.cursoActual.id === id) await openCourseEditor(id); toastSuccess(`Curso ${estado.toLowerCase()}`); } catch (error) { Swal.fire('No se pudo actualizar', error.message, 'error'); } }
+async function publishCurrentCourse() {
+  if (!AppState.cursoActual) return;
+  const result = await Swal.fire({
+    icon: 'question',
+    title: 'Publicar curso',
+    text: 'Define si este curso sera gratuito para visitantes o solo accesible por asignacion.',
+    confirmButtonText: 'Publicar gratis',
+    denyButtonText: 'Publicar no gratis',
+    showDenyButton: true,
+    showCancelButton: true,
+    cancelButtonText: 'Cancelar',
+  });
+  if (result.isConfirmed) await setCourseStatus(AppState.cursoActual.id, 'Publicado', { es_gratis: true });
+  if (result.isDenied) await setCourseStatus(AppState.cursoActual.id, 'Publicado', { es_gratis: false });
+}
 async function duplicateCourse(id) { try { await CursosService.duplicar(id); await loadCourses(); toastSuccess('Curso duplicado como borrador'); } catch (error) { Swal.fire('No se pudo duplicar', error.message, 'error'); } }
 async function deleteCourse(id) { if (!(await confirmAction('Eliminar curso', 'Se eliminara toda su estructura academica.'))) return; try { await CursosService.eliminar(id); await loadCourses(); toastSuccess('Curso eliminado'); } catch (error) { Swal.fire('No se pudo eliminar', error.message, 'error'); } }
 

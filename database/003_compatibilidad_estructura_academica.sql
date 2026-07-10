@@ -10,6 +10,7 @@ alter table public.cursos
   add column if not exists categoria text,
   add column if not exists campana_area text,
   add column if not exists duracion_estimada_min integer default 0,
+  add column if not exists es_gratis boolean not null default false,
   add column if not exists estado text default 'Borrador',
   add column if not exists creado_por bigint,
   add column if not exists created_at timestamptz default now(),
