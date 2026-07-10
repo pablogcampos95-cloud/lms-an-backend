@@ -491,9 +491,9 @@ function renderPublicCatalog() {
     return (!onlyFree || course.es_gratis === true) && (!search || text.includes(search)) && (!category || course.categoria === category);
   });
   grid.innerHTML = courses.length ? courses.map((course) => `
-    <article class="public-course-card">
-      <div class="public-course-cover">
-        ${course.imagen_portada_url ? `<img src="${escapeHtml(course.imagen_portada_url)}" alt="Portada de ${escapeHtml(course.nombre)}">` : '<div class="public-course-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>'}
+    <article class="public-course-card ${course.imagen_portada_url ? 'has-course-cover' : ''}" ${course.imagen_portada_url ? `style="--public-course-cover:url('${cssUrl(course.imagen_portada_url)}')"` : ''}>
+      <div class="public-course-cover" role="img" aria-label="Portada de ${escapeHtml(course.nombre)}">
+        ${course.imagen_portada_url ? '' : '<div class="public-course-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>'}
         <span>${course.es_gratis === true ? 'Curso gratis' : 'Curso disponible'}</span>
       </div>
       <div class="public-course-body">
@@ -1654,6 +1654,10 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function cssUrl(value) {
+  return String(value || '').replace(/['"\\\n\r]/g, '');
 }
 
 async function loadCourses() {
