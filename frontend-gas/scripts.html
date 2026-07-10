@@ -1831,7 +1831,7 @@ function renderStudentCoursePlayer() {
   const cover = curso.imagen_portada_url ? `style="background-image:linear-gradient(90deg,rgba(2,13,31,.94),rgba(2,20,42,.55)),url('${escapeHtml(curso.imagen_portada_url)}')"` : '';
   const isOutlineOpen = AppState.studentOutlineOpen;
   const outlineOpen = isOutlineOpen ? 'outline-open' : 'outline-collapsed';
-  const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div><span class="badge badge-soft">${escapeHtml(leccion.tipo_contenido)}</span></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
+  const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
   container.innerHTML = `
     <div class="student-course-player">
       <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
