@@ -31,6 +31,9 @@ const AppState = {
   publicHomeConfig: null,
   homeAdminConfig: null,
   publicSearchTypewriter: null,
+  publicRegisterModal: null,
+  googleClientId: null,
+  pendingFreeCourseId: null,
 };
 
 const loginContent = Object.freeze({
@@ -98,10 +101,14 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.takeEvaluationModal = new bootstrap.Modal(document.getElementById('takeEvaluationModal'));
   AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
   AppState.forumResponseModal = new bootstrap.Modal(document.getElementById('forumResponseModal'));
+  AppState.publicRegisterModal = new bootstrap.Modal(document.getElementById('publicRegisterModal'));
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('openPublicLogin').addEventListener('click', showLogin);
+  document.getElementById('openFreeCourses').addEventListener('click', scrollToFreeCourses);
   document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
+  document.getElementById('publicRegisterForm').addEventListener('submit', handlePublicRegister);
+  document.getElementById('googleRegisterFallback').addEventListener('click', handleGoogleRegisterFallback);
   document.getElementById('publicCourseSearch').addEventListener('input', renderPublicCatalog);
   document.getElementById('publicHeroSearch').addEventListener('input', syncPublicHeroSearch);
   document.getElementById('publicCategoryFilter').addEventListener('change', renderPublicCatalog);
@@ -182,6 +189,11 @@ function showPublicCatalog() {
   document.getElementById('loginScreen').classList.add('d-none');
   document.getElementById('appShell').classList.add('d-none');
   loadPublicCatalog();
+}
+
+function scrollToFreeCourses() {
+  const target = document.getElementById('publicCourses');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function handleLogin(event) {
@@ -341,6 +353,7 @@ function renderPublicHomeConfig() {
   document.getElementById('publicHeroTitle').innerHTML = renderPublicHeroTitle(heroCopy.title);
   document.getElementById('publicHeroDescription').textContent = heroCopy.description;
   document.getElementById('publicHeroActions').innerHTML = [
+    `<button class="btn btn-public-free btn-lg" type="button" onclick="scrollToFreeCourses()"><i class="fa-solid fa-gift me-2"></i>Cursos Gratis</button>`,
     config.showPrimaryButton !== false ? `<button class="btn btn-gold btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroPrimaryButtonUrl || '#publicCourses')}')"><i class="fa-solid fa-book-open me-2"></i>${escapeHtml(config.heroPrimaryButtonText || 'Explorar cursos')}</button>` : '',
     config.showSecondaryButton !== false ? `<button class="btn btn-outline-light btn-lg" type="button" onclick="handlePublicAction('${escapeHtml(config.heroSecondaryButtonUrl || '#login')}')"><i class="fa-solid fa-right-to-bracket me-2"></i>${escapeHtml(config.heroSecondaryButtonText || 'Ingresar al LMS')}</button>` : '',
   ].join('');
@@ -485,7 +498,7 @@ function renderPublicCatalog() {
           <span><i class="fa-solid fa-layer-group"></i>${course.cantidad_modulos || 0} modulos</span>
         </div>
         <button class="btn public-course-button" type="button" onclick="promptPublicLogin(${Number(course.id)})">
-          <i class="fa-solid fa-right-to-bracket me-2"></i>Ingresar para ver curso
+          <i class="fa-solid fa-gift me-2"></i>Acceder gratis
         </button>
       </div>
     </article>
@@ -507,14 +520,129 @@ function promptPublicLogin(courseId) {
   const courseName = course && course.nombre;
   Swal.fire({
     icon: 'info',
-    title: 'Inicia sesion para continuar',
-    text: courseName ? `Para acceder a "${courseName}" debes ingresar con tu usuario asignado.` : 'Para acceder al curso debes ingresar con tu usuario asignado.',
-    confirmButtonText: 'Iniciar sesion',
+    title: 'Accede a cursos gratis',
+    text: courseName ? `Registrate gratis o inicia sesion para acceder a "${courseName}".` : 'Registrate gratis o inicia sesion para acceder al curso.',
+    confirmButtonText: 'Registrarme gratis',
+    denyButtonText: 'Iniciar sesion',
+    showDenyButton: true,
     showCancelButton: true,
     cancelButtonText: 'Seguir explorando',
   }).then((result) => {
-    if (result.isConfirmed) showLogin();
+    if (result.isConfirmed) openPublicRegister(courseId);
+    if (result.isDenied) showLogin();
   });
+}
+
+function openPublicRegister(courseId = null) {
+  AppState.pendingFreeCourseId = courseId ? Number(courseId) : null;
+  document.getElementById('publicRegisterCourseId').value = AppState.pendingFreeCourseId || '';
+  document.getElementById('publicRegisterForm').reset();
+  document.getElementById('publicRegisterCourseId').value = AppState.pendingFreeCourseId || '';
+  AppState.publicRegisterModal.show();
+  initGoogleRegisterButton();
+}
+
+async function handlePublicRegister(event) {
+  event.preventDefault();
+  const button = document.getElementById('publicRegisterButton');
+  const payload = {
+    nombres: document.getElementById('publicRegisterName').value.trim(),
+    correo: document.getElementById('publicRegisterEmail').value.trim(),
+    dni: document.getElementById('publicRegisterDni').value.trim(),
+    usuario: document.getElementById('publicRegisterUser').value.trim(),
+    password: document.getElementById('publicRegisterPassword').value,
+    curso_id: document.getElementById('publicRegisterCourseId').value || null,
+  };
+
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando cuenta';
+  try {
+    const sessionUser = await AuthService.registerPublic(payload);
+    AppState.publicRegisterModal.hide();
+    await startSession(sessionUser);
+    if (payload.curso_id) showView('student-courses');
+    Swal.fire({ toast: true, position: 'top-end', timer: 2600, showConfirmButton: false, icon: 'success', title: 'Cuenta gratuita creada' });
+  } catch (error) {
+    Swal.fire('No se pudo registrar', error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>Registrarme gratis';
+  }
+}
+
+async function initGoogleRegisterButton() {
+  try {
+    const config = AppState.googleClientId ? { clientId: AppState.googleClientId, enabled: true } : await AuthService.googleConfig();
+    AppState.googleClientId = config.clientId;
+    const fallback = document.getElementById('googleRegisterFallback');
+    const container = document.getElementById('googleRegisterButton');
+    if (!config.enabled || !config.clientId) {
+      container.innerHTML = '';
+      fallback.classList.remove('d-none');
+      return;
+    }
+
+    await loadGoogleIdentityScript();
+    fallback.classList.add('d-none');
+    container.innerHTML = '';
+    google.accounts.id.initialize({
+      client_id: config.clientId,
+      callback: handleGoogleCredential,
+    });
+    google.accounts.id.renderButton(container, {
+      theme: 'outline',
+      size: 'large',
+      width: Math.min(360, container.clientWidth || 360),
+      text: 'continue_with',
+      shape: 'pill',
+    });
+  } catch (error) {
+    document.getElementById('googleRegisterFallback').classList.remove('d-none');
+  }
+}
+
+function loadGoogleIdentityScript() {
+  if (window.google && google.accounts && google.accounts.id) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function handleGoogleCredential(response) {
+  try {
+    const sessionUser = await AuthService.loginGoogle(response.credential, AppState.pendingFreeCourseId);
+    AppState.publicRegisterModal.hide();
+    await startSession(sessionUser);
+    showView('student-courses');
+    Swal.fire({ toast: true, position: 'top-end', timer: 2600, showConfirmButton: false, icon: 'success', title: 'Sesion iniciada con Google' });
+  } catch (error) {
+    Swal.fire('No se pudo iniciar con Google', error.message, 'error');
+  }
+}
+
+async function handleGoogleRegisterFallback() {
+  try {
+    const config = await AuthService.googleConfig();
+    if (!config.enabled) {
+      Swal.fire('Google pendiente de configurar', 'Para activar este boton debes agregar GOOGLE_CLIENT_ID en Railway con el Client ID de Google OAuth.', 'info');
+      return;
+    }
+    await initGoogleRegisterButton();
+  } catch (error) {
+    Swal.fire('Google pendiente de configurar', error.message, 'info');
+  }
 }
 
 async function loadHomeAdminConfig() {

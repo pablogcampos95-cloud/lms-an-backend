@@ -10,6 +10,34 @@ const login = async (req, res) => {
   });
 };
 
+const registerPublic = async (req, res) => {
+  const result = await authService.registerPublic(req.body);
+
+  res.status(201).json({
+    ok: true,
+    token: result.token,
+    usuario: result.usuario,
+    message: 'Cuenta gratuita creada correctamente',
+  });
+};
+
+const googleConfig = async (req, res) => {
+  res.json({
+    ok: true,
+    data: authService.googleConfig(),
+  });
+};
+
+const google = async (req, res) => {
+  const result = await authService.loginWithGoogle(req.body);
+
+  res.json({
+    ok: true,
+    token: result.token,
+    usuario: result.usuario,
+  });
+};
+
 const me = async (req, res) => {
   res.json({
     ok: true,
@@ -19,5 +47,8 @@ const me = async (req, res) => {
 
 module.exports = {
   login,
+  registerPublic,
+  googleConfig,
+  google,
   me,
 };

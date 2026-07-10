@@ -6,6 +6,7 @@ const ALLOWED_FIELDS = [
   'Correo',
   'Cargo',
   'Campaña',
+  'CampaÃ±a',
   'Supervisor',
   'Estado',
   'fecha_ingreso',
@@ -30,6 +31,11 @@ const pickUsuarioFields = (body) => {
       usuario[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
     }
   });
+
+  if (usuario['CampaÃ±a'] && !usuario['Campaña']) {
+    usuario['Campaña'] = usuario['CampaÃ±a'];
+  }
+  delete usuario['CampaÃ±a'];
 
   return usuario;
 };

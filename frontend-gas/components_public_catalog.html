@@ -14,7 +14,12 @@
       <a href="#publicCourses">Rutas</a>
       <a href="#publicBenefits">Beneficios</a>
     </nav>
-    <button id="openPublicLogin" class="btn btn-public-login" type="button">Acceder</button>
+    <div class="public-actions">
+      <button id="openFreeCourses" class="btn btn-public-free" type="button">
+        <i class="fa-solid fa-gift me-2"></i>Cursos Gratis
+      </button>
+      <button id="openPublicLogin" class="btn btn-public-login" type="button">Acceder</button>
+    </div>
   </header>
 
   <main class="public-catalog-main">
@@ -66,3 +71,53 @@
     </section>
   </main>
 </section>
+
+<div class="modal fade" id="publicRegisterModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="publicRegisterForm" class="modal-content public-register-modal">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">CURSOS GRATIS</span>
+          <h2 class="modal-title h4">Crea tu cuenta gratuita</h2>
+        </div>
+        <button class="btn-close btn-close-white" type="button" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <input id="publicRegisterCourseId" type="hidden">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="publicRegisterName">Nombre completo *</label>
+            <input id="publicRegisterName" class="form-control" autocomplete="name" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="publicRegisterEmail">Correo electronico *</label>
+            <input id="publicRegisterEmail" class="form-control" type="email" autocomplete="email" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="publicRegisterDni">Documento</label>
+            <input id="publicRegisterDni" class="form-control" inputmode="numeric" autocomplete="off">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="publicRegisterUser">Usuario</label>
+            <input id="publicRegisterUser" class="form-control" autocomplete="username" placeholder="Opcional">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="publicRegisterPassword">Contrasena *</label>
+            <input id="publicRegisterPassword" class="form-control" type="password" minlength="4" autocomplete="new-password" required>
+          </div>
+        </div>
+        <div class="public-register-divider"><span>o continua con</span></div>
+        <div id="googleRegisterButton" class="google-register-button"></div>
+        <button id="googleRegisterFallback" class="btn btn-outline-light w-100" type="button">
+          <i class="fa-brands fa-google me-2"></i>Iniciar sesion con Google
+        </button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-light" type="button" data-bs-dismiss="modal">Cancelar</button>
+        <button id="publicRegisterButton" class="btn btn-gold" type="submit">
+          <i class="fa-solid fa-user-plus me-2"></i>Registrarme gratis
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
