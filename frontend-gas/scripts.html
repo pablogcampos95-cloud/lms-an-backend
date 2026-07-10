@@ -1166,11 +1166,13 @@ function forumStarPicker(response) {
   return `<div class="forum-star-picker" aria-label="Calificacion por estrellas">${[5,4,3,2,1].map((value) => `<input id="forum-star-${response.id}-${value}" type="radio" name="forum-stars-${response.id}" value="${value}" ${Number(response.estrellas || 0) === value ? 'checked' : ''}><label for="forum-star-${response.id}-${value}" title="${value} estrellas"><i class="fa-solid fa-star"></i></label>`).join('')}</div>`;
 }
 
-function renderForumWorkspace(data, targetId) {
+function renderForumWorkspace(data, targetId, options = {}) {
   const target = document.getElementById(targetId);
-  const own = data.respuestas.find((response) => response.es_mia) || null;
-  const canGrade = Boolean(data.puede_calificar);
-  const comments = data.respuestas.length ? data.respuestas.map((response) => `
+  const responses = Array.isArray(data.respuestas) ? data.respuestas : [];
+  const own = responses.find((response) => response.es_mia) || null;
+  const readOnly = Boolean(options.readOnly || options.preview);
+  const canGrade = Boolean(data.puede_calificar) && !readOnly;
+  const comments = responses.length ? responses.map((response) => `
     <article class="forum-comment ${response.es_mia ? 'mine' : ''}">
       <div class="forum-comment-head"><div><strong>${escapeHtml(response.estudiante.Nombres || response.estudiante.usuario)}</strong>${response.es_mia ? '<span class="badge badge-soft ms-2">Tu respuesta</span>' : ''}</div><small>${response.enviado_at ? formatDate(response.enviado_at) : ''}</small></div>
       <p>${escapeHtml(response.texto)}</p>
@@ -1183,19 +1185,30 @@ function renderForumWorkspace(data, targetId) {
     ${data.foro.instrucciones ? `<div class="forum-instructions"><strong>Instrucciones</strong><span>${escapeHtml(data.foro.instrucciones)}</span></div>` : ''}
     ${data.foro.archivo_url ? `<a class="btn btn-outline-info btn-sm mt-3" href="${escapeHtml(data.foro.archivo_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip me-2"></i>${escapeHtml(data.foro.archivo_nombre || 'Ver recurso')}</a>` : ''}
     ${isStudent() ? `<div class="forum-response-editor"><label class="form-label fw-bold" for="forum-inline-response-${data.foro.id}">${own ? 'Actualiza tu respuesta' : 'Escribe tu participación'}</label><textarea id="forum-inline-response-${data.foro.id}" class="form-control" placeholder="Comparte tu análisis y aporta a la conversación">${escapeHtml(own ? own.texto : '')}</textarea><div class="d-flex justify-content-end mt-3"><button class="btn btn-gold" type="button" onclick="submitInlineForumResponse(${data.foro.id},'${targetId}')"><i class="fa-solid fa-paper-plane me-2"></i>${own ? 'Actualizar respuesta' : 'Publicar respuesta'}</button></div></div>` : ''}
-    <div class="d-flex align-items-center justify-content-between mt-4"><h3 class="h5 mb-0">Conversacion del curso</h3><span class="badge badge-soft">${data.respuestas.length} participaciones</span></div>
+    ${readOnly ? '<div class="alert alert-info mt-3 mb-0">Vista previa del foro. Aqui se mostraran las instrucciones, participaciones y calificaciones cuando el estudiante ingrese al curso.</div>' : ''}
+    <div class="d-flex align-items-center justify-content-between mt-4"><h3 class="h5 mb-0">Conversacion del curso</h3><span class="badge badge-soft">${responses.length} participaciones</span></div>
     <div class="forum-conversation">${comments}</div>`;
   if (targetId === 'forumWorkspace') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function loadForumWorkspace(id, targetId = 'forumWorkspace') {
+async function loadForumWorkspace(id, targetId = 'forumWorkspace', options = {}) {
   const target = document.getElementById(targetId);
   if (!target) return;
   target.classList.remove('d-none');
   target.innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando conversacion...</div>';
   try {
-    renderForumWorkspace(await EvaluacionesService.resultadosForo(id), targetId);
+    renderForumWorkspace(await EvaluacionesService.resultadosForo(id), targetId, options);
   } catch (error) {
+    if (options.preview) {
+      try {
+        const foro = await EvaluacionesService.obtenerForo(id);
+        renderForumWorkspace({ foro, respuestas: [], puede_calificar: false }, targetId, { ...options, readOnly: true });
+        return;
+      } catch (fallbackError) {
+        target.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(fallbackError.message)}</div>`;
+        return;
+      }
+    }
     target.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(error.message)}</div>`;
   }
 }
@@ -1834,8 +1847,8 @@ function renderStudentCoursePlayer() {
         </main>
       </div>
     </div>`;
-  if (leccion.es_actividad && leccion.tipo_actividad === 'Foro' && !AppState.previewMode) {
-    setTimeout(() => loadForumWorkspace(leccion.id, `integratedForum-${leccion.id}`), 0);
+  if (leccion.es_actividad && leccion.tipo_actividad === 'Foro') {
+    setTimeout(() => loadForumWorkspace(leccion.id, `integratedForum-${leccion.id}`, { preview: AppState.previewMode }), 0);
   }
 }
 
