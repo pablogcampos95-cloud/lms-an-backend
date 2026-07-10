@@ -1,11 +1,14 @@
 const path = require('path');
+const crypto = require('crypto');
 
 const academicoService = require('../services/academico.service');
 const supabase = require('../services/supabase.service');
 const AppError = require('../utils/AppError');
 const estudianteService = require('../services/estudiante.service');
+const firebaseStorage = require('../services/firebase-storage.service');
 
 const ok = (res, data, message) => res.json({ ok: true, message, data });
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const listarCursos = async (req, res) => {
   const rol = req.user.rol && req.user.rol.nombre;
@@ -31,6 +34,24 @@ const eliminarCurso = async (req, res) => ok(res, await academicoService.deleteC
 const duplicarCurso = async (req, res) => res.status(201).json({ ok: true, data: await academicoService.duplicateCurso(req.params.id, req.user.id) });
 const obtenerEstudiantesCurso = async (req, res) => ok(res, await estudianteService.getCourseStudents(req.params.id));
 const asignarEstudiantesCurso = async (req, res) => ok(res, await estudianteService.setCourseStudents(req.params.id, req.body.usuario_ids, req.user.id), 'Estudiantes asignados');
+
+const subirPortadaCurso = async (req, res) => {
+  if (!req.file) throw new AppError('Debes seleccionar una imagen de portada', 400);
+  if (!IMAGE_MIME_TYPES.has(req.file.mimetype)) {
+    throw new AppError('Solo puedes subir imagenes JPG, PNG o WEBP como portada', 400);
+  }
+
+  const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `curso-portadas/${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${safeName}`;
+
+  const upload = await firebaseStorage.uploadPublicFile({
+    buffer: req.file.buffer,
+    contentType: req.file.mimetype,
+    destination: storagePath,
+  });
+
+  res.status(201).json({ ok: true, data: upload });
+};
 
 const listarModulos = async (req, res) => ok(res, await academicoService.listModulos(req.query.curso_id));
 const crearModulo = async (req, res) => res.status(201).json({ ok: true, data: await academicoService.createModulo(req.body) });
@@ -87,6 +108,7 @@ const completarLeccion = async (req, res) => {
 
 module.exports = {
   listarCursos, listarCursosPublicos, obtenerCurso, obtenerCursoPublicado, crearCurso, actualizarCurso, eliminarCurso, duplicarCurso, obtenerEstudiantesCurso, asignarEstudiantesCurso,
+  subirPortadaCurso,
   listarModulos, crearModulo, actualizarModulo, eliminarModulo, ordenarModulo,
   listarLecciones, crearLeccion, actualizarLeccion, eliminarLeccion, ordenarLeccion,
   subirArchivo, completarLeccion,
