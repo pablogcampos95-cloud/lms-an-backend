@@ -590,6 +590,54 @@
     z-index: 3;
     background: linear-gradient(155deg, rgba(10, 31, 62, 0.98), rgba(3, 13, 33, 0.99));
   }
+  .lesson-form-dialog {
+    height: calc(100vh - 32px);
+    max-width: min(1120px, calc(100vw - 32px));
+    margin: 16px auto;
+  }
+  .lesson-form-dialog .modal-content {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .lesson-form-dialog form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+  .lesson-form-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 18px;
+    scrollbar-color: var(--cyan) rgba(0, 216, 255, 0.14);
+    scrollbar-width: thin;
+  }
+  .lesson-form-body::-webkit-scrollbar {
+    width: 12px;
+  }
+  .lesson-form-body::-webkit-scrollbar-track {
+    background: rgba(0, 216, 255, 0.08);
+    border-radius: 999px;
+  }
+  .lesson-form-body::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--cyan), var(--electric));
+    border: 3px solid #06152c;
+    border-radius: 999px;
+  }
+  .lesson-form-dialog .modal-footer {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: linear-gradient(155deg, rgba(10, 31, 62, 0.98), rgba(3, 13, 33, 0.99));
+  }
+  .lesson-form-body .embed-preview {
+    max-height: min(48vh, 520px);
+    min-height: 320px;
+  }
 
   #evaluationModal .evaluation-builder-dialog {
     height: calc(100vh - 24px);
