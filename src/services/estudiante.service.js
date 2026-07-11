@@ -11,6 +11,45 @@ const buildCertificateCode = (usuarioId, cursoId) => (
   `IALS-${usuarioId}-${cursoId}-${crypto.createHash('sha1').update(`${usuarioId}:${cursoId}`).digest('hex').slice(0, 8).toUpperCase()}`
 );
 
+const DEFAULT_CERTIFICATE_TEMPLATE = {
+  nombre: 'Diploma IA Learning Solutions',
+  titulo: 'Diploma de finalizacion de curso',
+  subtitulo: '{{curso}}',
+  cuerpo: 'Certificado emitido para {{nombre}} el {{fecha}}.',
+  firma_nombre: 'Pablo Gutierrez Campos',
+  firma_cargo: 'Director General',
+  color_principal: '#00d8ff',
+  fondo_url: '/assets/certificates/ials-diploma-template.png',
+};
+
+const formatCertificateDate = (value) => {
+  const date = value ? new Date(value) : new Date();
+  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
+};
+
+const replaceCertificatePlaceholders = (value, fields) => String(value || '')
+  .replaceAll('{{nombre}}', fields.nombre)
+  .replaceAll('{{curso}}', fields.curso)
+  .replaceAll('{{fecha}}', fields.fecha);
+
+const applyCertificateTemplate = (template, certificate, user) => {
+  const base = template || DEFAULT_CERTIFICATE_TEMPLATE;
+  const fields = {
+    nombre: user?.Nombres || user?.usuario || 'Participante',
+    curso: certificate.curso?.nombre || 'Curso finalizado',
+    fecha: formatCertificateDate(certificate.emitido_at),
+  };
+  return {
+    ...base,
+    titulo_render: replaceCertificatePlaceholders(base.titulo, fields),
+    subtitulo_render: replaceCertificatePlaceholders(base.subtitulo, fields),
+    cuerpo_render: replaceCertificatePlaceholders(base.cuerpo, fields),
+    participante: fields.nombre,
+    curso_finalizado: fields.curso,
+    fecha_emision: fields.fecha,
+  };
+};
+
 const isCertificateSchemaError = (error) => {
   if (!error) return false;
   const message = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' ');
@@ -115,7 +154,27 @@ const getCertificates = async (usuarioId) => {
   const courses = await getAssignedCoursesProgress(usuarioId);
   await syncCertificates(usuarioId, courses);
   const { data, error } = await supabase.from('certificados').select('id,codigo,emitido_at,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId).order('emitido_at', { ascending: false });
-  if (!error) return data;
+  const { data: user } = await supabase.from('usuarios').select('id,"Nombres",usuario').eq('id', usuarioId).maybeSingle();
+  const enrich = async (certificates) => {
+    if (!certificates.length) return [];
+    const courseIds = certificates.map((certificate) => certificate.curso?.id || certificate.curso_id).filter(Boolean);
+    const { data: templates } = await supabase
+      .from('certificado_plantillas')
+      .select('*')
+      .eq('activo', true)
+      .or(courseIds.length ? `curso_id.is.null,curso_id.in.(${courseIds.join(',')})` : 'curso_id.is.null')
+      .order('curso_id', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    return certificates.map((certificate) => {
+      const courseId = certificate.curso?.id || certificate.curso_id;
+      const template = (templates || []).find((item) => Number(item.curso_id) === Number(courseId)) || (templates || []).find((item) => item.curso_id === null) || DEFAULT_CERTIFICATE_TEMPLATE;
+      return {
+        ...certificate,
+        plantilla: applyCertificateTemplate(template, certificate, user),
+      };
+    });
+  };
+  if (!error) return enrich(data || []);
   if (!isCertificateSchemaError(error)) throwSupabaseError(error);
 
   const fallback = await supabase.from('certificados').select('id,curso_id,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId);
@@ -123,11 +182,11 @@ const getCertificates = async (usuarioId) => {
     if (isCertificateSchemaError(fallback.error)) return [];
     throwSupabaseError(fallback.error);
   }
-  return fallback.data.map((certificate) => ({
+  return enrich(fallback.data.map((certificate) => ({
     ...certificate,
     codigo: buildCertificateCode(usuarioId, certificate.curso_id || certificate.curso?.id),
     emitido_at: null,
-  }));
+  })));
 };
 
 const getAssignments = async (usuarioId) => {

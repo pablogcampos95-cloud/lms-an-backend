@@ -831,6 +831,14 @@
   .certificate-template-body { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:18px; }
   .certificate-template-body h3 { margin:10px 0 4px; font-size:1.02rem; }
   .certificate-template-body p { margin:0; color:var(--muted); }
+  .issued-certificate { position:relative;width:min(100%,1120px);aspect-ratio:3496/2480;margin:0 auto;overflow:hidden;border:1px solid var(--line-strong);border-radius:16px;background:var(--certificate-bg) center center/cover no-repeat;box-shadow:0 24px 70px rgba(0,0,0,.35); }
+  .issued-certificate-course,
+  .issued-certificate-participant,
+  .issued-certificate-date { position:absolute;left:50%;width:64%;transform:translateX(-50%);text-align:center;text-shadow:0 2px 10px rgba(0,0,0,.42); }
+  .issued-certificate-course { top:38.5%;color:var(--certificate-accent,var(--cyan));font-size:clamp(1rem,2.4vw,1.85rem);font-weight:700;line-height:1.18; }
+  .issued-certificate-participant { top:46.5%;color:#d7dce7;font-size:clamp(1.75rem,4vw,3.2rem);font-weight:500;line-height:1.1; }
+  .issued-certificate-participant::after { content:"";display:block;width:76%;height:2px;margin:18px auto 0;background:rgba(215,220,231,.25); }
+  .issued-certificate-date { top:67%;color:#9ca7b7;font-size:clamp(.9rem,1.7vw,1.25rem);font-weight:700; }
   .profile-progress-card, .achievement-card { padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); box-shadow: var(--shadow); }
   .profile-progress-header { display: flex; align-items: center; gap: 18px; }
   .profile-progress-header h2 { margin: 2px 0; font-size: 1.65rem; }.profile-progress-header p { margin: 0; color: var(--muted); }

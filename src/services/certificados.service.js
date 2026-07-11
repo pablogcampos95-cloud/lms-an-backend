@@ -4,6 +4,20 @@ const supabase = require('./supabase.service');
 const AppError = require('../utils/AppError');
 
 const sanitizeText = (value) => sanitizeHtml(String(value || '').trim(), { allowedTags: [], allowedAttributes: {} });
+const DEFAULT_CERTIFICATE_TEMPLATE = {
+  nombre: 'Diploma IA Learning Solutions',
+  descripcion: 'Plantilla base para certificados de finalizacion. Solo cambia curso, participante y fecha.',
+  curso_id: null,
+  titulo: 'Diploma de finalizacion de curso',
+  subtitulo: '{{curso}}',
+  cuerpo: 'Certificado emitido para {{nombre}} el {{fecha}}.',
+  firma_nombre: 'Pablo Gutierrez Campos',
+  firma_cargo: 'Director General',
+  color_principal: '#00d8ff',
+  fondo_url: '/assets/certificates/ials-diploma-template.png',
+  activo: true,
+  creado_por: null,
+};
 
 const throwSupabaseError = (error, message = 'Error al consultar Supabase') => {
   if (!error) return;
@@ -38,7 +52,22 @@ const prepareTemplatePayload = (payload = {}, userId) => {
   };
 };
 
+const ensureDefaultTemplate = async () => {
+  const { data: existing, error: findError } = await supabase
+    .from('certificado_plantillas')
+    .select('id')
+    .eq('nombre', DEFAULT_CERTIFICATE_TEMPLATE.nombre)
+    .maybeSingle();
+  throwSupabaseError(findError, 'No se pudo consultar la plantilla base de certificado');
+  if (existing) return;
+  const { error } = await supabase
+    .from('certificado_plantillas')
+    .insert(DEFAULT_CERTIFICATE_TEMPLATE);
+  throwSupabaseError(error, 'No se pudo crear la plantilla base de certificado');
+};
+
 const listTemplates = async () => {
+  await ensureDefaultTemplate();
   const { data, error } = await supabase
     .from('certificado_plantillas')
     .select('*, curso:cursos(id,nombre,categoria)')

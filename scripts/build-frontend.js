@@ -5,6 +5,8 @@ const root = path.resolve(__dirname, '..');
 const sourceDir = path.join(root, 'frontend-gas');
 const outputDir = path.join(root, 'public');
 const indexPath = path.join(sourceDir, 'index.html');
+const assetsSourceDir = path.join(sourceDir, 'assets');
+const assetsOutputDir = path.join(outputDir, 'assets');
 
 const includePattern = /<\?!=\s*include\('([^']+)'\);\s*\?>/g;
 
@@ -24,6 +26,9 @@ const build = () => {
 
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(path.join(outputDir, 'index.html'), html, 'utf8');
+  if (fs.existsSync(assetsSourceDir)) {
+    fs.cpSync(assetsSourceDir, assetsOutputDir, { recursive: true });
+  }
   fs.writeFileSync(
     path.join(outputDir, 'robots.txt'),
     'User-agent: *\nAllow: /\n',
