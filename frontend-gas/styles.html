@@ -1320,6 +1320,25 @@
     border-radius: 16px;
   }
 
+  .lesson-video-shell {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .lesson-video-player {
+    display: block;
+    width: 100%;
+    max-width: 1180px;
+    max-height: min(72vh, 760px);
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--line-strong);
+    border-radius: 18px;
+    background: #020814;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  }
+
   .lesson-content :where(img, video) {
     display: block;
     margin-inline: auto;

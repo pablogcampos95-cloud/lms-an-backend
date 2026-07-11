@@ -2201,16 +2201,49 @@ function renderLessonTypeFields() {
   document.querySelectorAll('.lesson-type-fields').forEach((element) => element.classList.add('d-none'));
   const type = document.getElementById('lessonType').value;
   if (type === 'Texto' || type === 'Evaluacion') document.getElementById('lessonTextFields').classList.remove('d-none');
-  if (type === 'URL' || type === 'Video') document.getElementById('lessonUrlFields').classList.remove('d-none');
+  if (type === 'URL') document.getElementById('lessonUrlFields').classList.remove('d-none');
   if (type === 'HTML') document.getElementById('lessonHtmlFields').classList.remove('d-none');
-  if (type === 'Archivo') document.getElementById('lessonFileFields').classList.remove('d-none');
+  if (type === 'Archivo' || type === 'Video') {
+    document.getElementById('lessonFileFields').classList.remove('d-none');
+    document.getElementById('lessonFileLabel').textContent = type === 'Video' ? 'Video del curso (MP4, MOV o WEBM)' : 'Archivo (maximo 50 MB)';
+    document.getElementById('lessonFileHelp').textContent = type === 'Video' ? 'El video se almacenara en Supabase y se reproducira dentro del curso.' : 'El paso se guarda primero y luego se carga el archivo.';
+    document.getElementById('lessonFile').accept = type === 'Video' ? '.mp4,.mov,.webm' : '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.zip';
+  }
 }
 
-function getLessonPayload() { return { modulo_id: Number(document.getElementById('lessonModuleId').value), titulo: document.getElementById('lessonTitle').value.trim(), descripcion: document.getElementById('lessonDescription').value.trim(), tipo_contenido: document.getElementById('lessonType').value, contenido_texto: document.getElementById('lessonText').value, contenido_html: document.getElementById('lessonHtml').value, url_externa: document.getElementById('lessonUrl').value.trim() || null, tipo_url: document.getElementById('lessonUrlType').value, abrir_nueva_pestana: document.getElementById('lessonNewTab').checked, mostrar_embebido: document.getElementById('lessonEmbedded').checked, tiempo_estimado_min: Number(document.getElementById('lessonDuration').value || 0), requisito_avance: document.getElementById('lessonRequirement').value, estado: document.getElementById('lessonStatus').value }; }
+function getLessonPayload() {
+  const type = document.getElementById('lessonType').value;
+  return {
+    modulo_id: Number(document.getElementById('lessonModuleId').value),
+    titulo: document.getElementById('lessonTitle').value.trim(),
+    descripcion: document.getElementById('lessonDescription').value.trim(),
+    tipo_contenido: type,
+    contenido_texto: type === 'Texto' || type === 'Evaluacion' ? document.getElementById('lessonText').value : '',
+    contenido_html: type === 'HTML' ? document.getElementById('lessonHtml').value : '',
+    url_externa: type === 'URL' ? document.getElementById('lessonUrl').value.trim() || null : null,
+    tipo_url: type === 'Video' ? 'video' : document.getElementById('lessonUrlType').value,
+    abrir_nueva_pestana: type === 'URL' ? document.getElementById('lessonNewTab').checked : false,
+    mostrar_embebido: type === 'URL' ? document.getElementById('lessonEmbedded').checked : type === 'Video',
+    tiempo_estimado_min: Number(document.getElementById('lessonDuration').value || 0),
+    requisito_avance: document.getElementById('lessonRequirement').value,
+    estado: document.getElementById('lessonStatus').value,
+  };
+}
 
 async function saveLesson(event) {
   event.preventDefault(); const id = document.getElementById('lessonId').value; const payload = getLessonPayload();
-  try { const leccion = id ? await CursosService.actualizarLeccion(id, payload) : await CursosService.crearLeccion(payload); const file = document.getElementById('lessonFile').files[0]; if (file) await CursosService.subirArchivo(leccion.id, AppState.cursoActual.id, payload.modulo_id, file); AppState.lessonModal.hide(); await openCourseEditor(AppState.cursoActual.id); toastSuccess('Paso guardado'); } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
+  try {
+    const file = document.getElementById('lessonFile').files[0];
+    const currentLesson = id ? findLesson(Number(id)) : null;
+    const hasVideoResource = currentLesson && Array.isArray(currentLesson.recursos) && currentLesson.recursos.some(isVideoResource);
+    if (payload.tipo_contenido === 'Video' && !file && !hasVideoResource) {
+      Swal.fire('Falta el video', 'Selecciona un archivo MP4, MOV o WEBM para este paso.', 'warning');
+      return;
+    }
+    const leccion = id ? await CursosService.actualizarLeccion(id, payload) : await CursosService.crearLeccion(payload);
+    if (file) await CursosService.subirArchivo(leccion.id, AppState.cursoActual.id, payload.modulo_id, file);
+    AppState.lessonModal.hide(); await openCourseEditor(AppState.cursoActual.id); toastSuccess('Paso guardado');
+  } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
 }
 
 async function moveLesson(id, direction) { try { await CursosService.ordenarLeccion(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
@@ -2271,9 +2304,24 @@ async function saveCourseAssignments() {
 function renderLessonPreview(leccion) {
   if (leccion.tipo_contenido === 'HTML') return `<div class="responsive-embed">${leccion.contenido_html || ''}</div>`;
   if (leccion.tipo_contenido === 'Texto' || leccion.tipo_contenido === 'Evaluacion') return `<p>${escapeHtml(leccion.contenido_texto || leccion.descripcion || '')}</p>`;
-  if ((leccion.tipo_contenido === 'URL' || leccion.tipo_contenido === 'Video') && leccion.url_externa) return leccion.mostrar_embebido ? `<div class="responsive-embed"><iframe src="${escapeHtml(leccion.url_externa)}" loading="lazy"></iframe></div>` : `<a class="btn btn-outline-warning" href="${escapeHtml(leccion.url_externa)}" target="_blank" rel="noopener">Abrir recurso</a>`;
+  if (leccion.tipo_contenido === 'Video') {
+    const video = Array.isArray(leccion.recursos) ? leccion.recursos.find(isVideoResource) : null;
+    if (video && video.url) return renderVideoPlayer(video);
+    if (leccion.url_externa) return `<div class="lesson-video-shell"><video class="lesson-video-player" src="${escapeHtml(leccion.url_externa)}" controls preload="metadata"></video></div>`;
+  }
+  if (leccion.tipo_contenido === 'URL' && leccion.url_externa) return leccion.mostrar_embebido ? `<div class="responsive-embed"><iframe src="${escapeHtml(leccion.url_externa)}" loading="lazy"></iframe></div>` : `<a class="btn btn-outline-warning" href="${escapeHtml(leccion.url_externa)}" target="_blank" rel="noopener">Abrir recurso</a>`;
   if (leccion.recursos && leccion.recursos.length) return leccion.recursos.map((recurso) => `<a class="btn btn-outline-light me-2" href="${escapeHtml(recurso.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-download me-2"></i>${escapeHtml(recurso.nombre_original)}</a>`).join('');
   return '<span class="text-secondary">Contenido pendiente.</span>';
+}
+
+function isVideoResource(recurso) {
+  const mime = String(recurso && recurso.tipo_archivo || '').toLowerCase();
+  const name = String(recurso && recurso.nombre_original || recurso && recurso.url || '').toLowerCase();
+  return mime.startsWith('video/') || /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(name);
+}
+
+function renderVideoPlayer(recurso) {
+  return `<div class="lesson-video-shell"><video class="lesson-video-player" src="${escapeHtml(recurso.url)}" controls preload="metadata" playsinline></video><a class="btn btn-outline-light btn-sm mt-3" href="${escapeHtml(recurso.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Abrir video en otra pestana</a></div>`;
 }
 
 async function confirmAction(title, text) { const result = await Swal.fire({ title, text, icon: 'warning', showCancelButton: true, confirmButtonText: 'Confirmar', cancelButtonText: 'Cancelar' }); return result.isConfirmed; }

@@ -10,7 +10,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    const allowed = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|png|webp|mp4|mov|zip)$/i;
+    const allowed = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|png|webp|mp4|mov|webm|zip)$/i;
     callback(null, allowed.test(file.originalname));
   },
 });
