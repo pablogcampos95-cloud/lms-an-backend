@@ -144,6 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('assignCourseStudents').addEventListener('click', openCourseAssignmentModal);
   document.getElementById('saveCourseAssignments').addEventListener('click', saveCourseAssignments);
   document.getElementById('certificateTemplateForm').addEventListener('submit', saveCertificateTemplate);
+  document.getElementById('certificateTemplateBackgroundFile').addEventListener('change', previewSelectedCertificateBackground);
+  ['certificateTemplateTitle', 'certificateTemplateSubtitle', 'certificateTemplateBody', 'certificateTemplateColor'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', renderCertificateTemplatePreview);
+  });
   document.getElementById('evaluationForm').addEventListener('submit', saveEvaluation);
   document.getElementById('takeEvaluationForm').addEventListener('submit', submitEvaluationAttempt);
   document.getElementById('forumForm').addEventListener('submit', saveForum);
@@ -1455,7 +1459,7 @@ function renderCertificateTemplates() {
   container.className = 'certificate-template-grid';
   container.innerHTML = templates.map((template) => `
     <article class="certificate-template-card">
-      <div class="certificate-template-preview" style="--certificate-accent:${escapeHtml(template.color_principal || '#00d8ff')}; ${template.fondo_url ? `background-image: linear-gradient(135deg, rgba(3,13,33,.84), rgba(3,13,33,.94)), url('${escapeHtml(template.fondo_url)}');` : ''}">
+      <div class="certificate-template-preview" style="--certificate-accent:${escapeHtml(template.color_principal || '#00d8ff')}; ${template.fondo_url ? `background-image: linear-gradient(135deg, rgba(3,13,33,.84), rgba(3,13,33,.94)), url('${cssUrl(template.fondo_url)}');` : ''}">
         <span>Certificado</span>
         <strong>${escapeHtml(template.titulo)}</strong>
         <small>${escapeHtml(template.subtitulo || 'IA Learning Solutions')}</small>
@@ -1496,9 +1500,62 @@ async function openCertificateTemplateModal(id = null) {
   document.getElementById('certificateTemplateSignerRole').value = template ? template.firma_cargo || '' : '';
   document.getElementById('certificateTemplateColor').value = template ? template.color_principal || '#00d8ff' : '#00d8ff';
   document.getElementById('certificateTemplateBackground').value = template ? template.fondo_url || '' : '';
+  document.getElementById('certificateTemplateBackgroundFile').value = '';
   document.getElementById('certificateTemplateActive').checked = template ? template.activo !== false : true;
   populateCertificateCourseOptions(template ? template.curso_id : '');
+  renderCertificateTemplatePreview();
   AppState.certificateTemplateModal.show();
+}
+
+function renderCertificateTemplatePreview() {
+  const preview = document.getElementById('certificateTemplatePreview');
+  if (!preview) return;
+  const title = document.getElementById('certificateTemplateTitle').value.trim() || 'Certificado de finalizacion';
+  const subtitle = document.getElementById('certificateTemplateSubtitle').value.trim() || 'Otorgado por IA Learning Solutions';
+  const body = document.getElementById('certificateTemplateBody').value.trim() || 'Se certifica que {{nombre}} completo satisfactoriamente el curso {{curso}}.';
+  const color = document.getElementById('certificateTemplateColor').value || '#00d8ff';
+  const background = document.getElementById('certificateTemplateBackground').value.trim();
+  preview.style.setProperty('--certificate-accent', color);
+  preview.style.backgroundImage = background
+    ? `linear-gradient(135deg, rgba(3,13,33,.80), rgba(3,13,33,.94)), url("${cssUrl(background)}")`
+    : '';
+  preview.innerHTML = `
+    <span>Vista previa</span>
+    <strong>${escapeHtml(title)}</strong>
+    <p>${escapeHtml(body)}</p>
+    <small>${escapeHtml(subtitle)}</small>
+  `;
+}
+
+function previewSelectedCertificateBackground() {
+  const input = document.getElementById('certificateTemplateBackgroundFile');
+  const file = input.files && input.files[0];
+  if (!file) {
+    renderCertificateTemplatePreview();
+    return;
+  }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    input.value = '';
+    Swal.fire('Archivo no permitido', 'Sube una imagen JPG, PNG o WEBP.', 'warning');
+    renderCertificateTemplatePreview();
+    return;
+  }
+  document.getElementById('certificateTemplateBackground').value = URL.createObjectURL(file);
+  renderCertificateTemplatePreview();
+}
+
+async function uploadCertificateBackgroundIfNeeded() {
+  const input = document.getElementById('certificateTemplateBackgroundFile');
+  const file = input.files && input.files[0];
+  if (!file) {
+    const current = document.getElementById('certificateTemplateBackground').value.trim();
+    return current && !current.startsWith('blob:') ? current : null;
+  }
+  const upload = await CertificadosService.subirFondo(file);
+  input.value = '';
+  document.getElementById('certificateTemplateBackground').value = upload.url;
+  renderCertificateTemplatePreview();
+  return upload.url;
 }
 
 function getCertificateTemplatePayload() {
@@ -1521,8 +1578,10 @@ async function saveCertificateTemplate(event) {
   event.preventDefault();
   const id = document.getElementById('certificateTemplateId').value;
   try {
-    if (id) await CertificadosService.actualizarPlantilla(id, getCertificateTemplatePayload());
-    else await CertificadosService.crearPlantilla(getCertificateTemplatePayload());
+    const payload = getCertificateTemplatePayload();
+    payload.fondo_url = await uploadCertificateBackgroundIfNeeded();
+    if (id) await CertificadosService.actualizarPlantilla(id, payload);
+    else await CertificadosService.crearPlantilla(payload);
     AppState.certificateTemplateModal.hide();
     await loadCertificateTemplates();
     toastSuccess('Plantilla guardada');
