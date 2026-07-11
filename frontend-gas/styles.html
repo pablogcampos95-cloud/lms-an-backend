@@ -638,6 +638,12 @@
     max-height: min(48vh, 520px);
     min-height: 320px;
   }
+  #lessonForm.is-saving .lesson-form-body {
+    cursor: progress;
+  }
+  #lessonForm.is-saving .lesson-form-body :is(input, textarea, select, button) {
+    pointer-events: none;
+  }
 
   #evaluationModal .evaluation-builder-dialog {
     height: calc(100vh - 24px);

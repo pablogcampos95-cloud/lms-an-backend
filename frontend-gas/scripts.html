@@ -108,6 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
   AppState.forumResponseModal = new bootstrap.Modal(document.getElementById('forumResponseModal'));
   AppState.publicRegisterModal = new bootstrap.Modal(document.getElementById('publicRegisterModal'));
+  document.getElementById('lessonModal').addEventListener('hide.bs.modal', (event) => {
+    if (AppState.lessonSaving) event.preventDefault();
+  });
   const coursePreviewElement = document.getElementById('coursePreviewModal');
   coursePreviewElement.addEventListener('hide.bs.modal', () => stopPlaybackInElement(coursePreviewElement));
   coursePreviewElement.addEventListener('hidden.bs.modal', () => {
@@ -2238,7 +2241,11 @@ function getLessonPayload() {
 }
 
 async function saveLesson(event) {
-  event.preventDefault(); const id = document.getElementById('lessonId').value; const payload = getLessonPayload();
+  event.preventDefault();
+  if (AppState.lessonSaving) return;
+  AppState.lessonSaving = true;
+  setLessonSavingState(true);
+  const id = document.getElementById('lessonId').value; const payload = getLessonPayload();
   try {
     const file = document.getElementById('lessonFile').files[0];
     const currentLesson = id ? findLesson(Number(id)) : null;
@@ -2249,8 +2256,27 @@ async function saveLesson(event) {
     }
     const leccion = id ? await CursosService.actualizarLeccion(id, payload) : await CursosService.crearLeccion(payload);
     if (file) await CursosService.subirArchivo(leccion.id, AppState.cursoActual.id, payload.modulo_id, file);
+    AppState.lessonSaving = false;
+    setLessonSavingState(false);
     AppState.lessonModal.hide(); await openCourseEditor(AppState.cursoActual.id); toastSuccess('Paso guardado');
   } catch (error) { Swal.fire('No se pudo guardar', error.message, 'error'); }
+  finally {
+    if (AppState.lessonSaving) {
+      AppState.lessonSaving = false;
+      setLessonSavingState(false);
+    }
+  }
+}
+
+function setLessonSavingState(isSaving) {
+  const saveButton = document.getElementById('saveLessonButton');
+  const cancelButton = document.getElementById('cancelLessonSave');
+  const form = document.getElementById('lessonForm');
+  if (!saveButton || !form) return;
+  saveButton.disabled = isSaving;
+  saveButton.innerHTML = isSaving ? '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...' : 'Guardar paso';
+  if (cancelButton) cancelButton.disabled = isSaving;
+  form.classList.toggle('is-saving', isSaving);
 }
 
 async function moveLesson(id, direction) { try { await CursosService.ordenarLeccion(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
