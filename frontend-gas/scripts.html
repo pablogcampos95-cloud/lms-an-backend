@@ -1024,11 +1024,20 @@ function renderStudentDashboard(data) {
   achievement.querySelector('.achievement-streak strong').textContent = `${data.avanceGeneral}%`;
   achievement.querySelector('.achievement-streak span').textContent = 'Avance general';
   if (featured) {
-    if (featured.imagen_portada_url) {
-      const safeCoverUrl = String(featured.imagen_portada_url).replace(/["\\\n\r]/g, '');
+    const dashboardCourse = (data.cursos || []).find((course) => Number(course.id) === Number(featured.id)) || {};
+    const stateCourse = AppState.cursos.find((course) => Number(course.id) === Number(featured.id)) || {};
+    const coverUrl = featured.imagen_portada_url || dashboardCourse.imagen_portada_url || stateCourse.imagen_portada_url || '';
+    if (coverUrl) {
+      const safeCoverUrl = cssUrl(coverUrl);
       heroSection.style.setProperty('--course-cover-url', `url("${safeCoverUrl}")`);
+      heroSection.style.backgroundImage = `linear-gradient(90deg, rgba(2, 13, 31, .96) 0%, rgba(2, 18, 42, .82) 42%, rgba(2, 18, 42, .44) 74%, rgba(2, 13, 31, .58) 100%), url("${safeCoverUrl}")`;
+      heroSection.style.backgroundSize = 'cover';
+      heroSection.style.backgroundPosition = 'center center';
       heroSection.classList.add('has-course-cover');
     } else {
+      heroSection.style.backgroundImage = '';
+      heroSection.style.backgroundSize = '';
+      heroSection.style.backgroundPosition = '';
       heroSection.style.removeProperty('--course-cover-url');
       heroSection.classList.remove('has-course-cover');
     }
@@ -1037,6 +1046,9 @@ function renderStudentDashboard(data) {
     document.getElementById('featuredCourseMeta').innerHTML = `<span><i class="fa-regular fa-clock"></i> ${featured.duracion_estimada_min || 0} min</span><span><i class="fa-solid fa-layer-group"></i> ${featured.cantidad_modulos || 0} modulos</span><span><i class="fa-solid fa-chart-line"></i> ${featured.avance}%</span>`;
     hero.querySelector('.hero-actions').innerHTML = `<button class="btn btn-gold btn-lg" type="button" onclick="openStudentCourse(${featured.id})"><i class="fa-solid fa-play me-2"></i>${featured.avance ? 'Continuar curso' : 'Comenzar curso'}</button>`;
   } else {
+    heroSection.style.backgroundImage = '';
+    heroSection.style.backgroundSize = '';
+    heroSection.style.backgroundPosition = '';
     heroSection.style.removeProperty('--course-cover-url');
     heroSection.classList.remove('has-course-cover');
     document.getElementById('featuredCourseName').textContent = 'Aun no tienes cursos asignados';
