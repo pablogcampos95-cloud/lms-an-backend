@@ -5,7 +5,6 @@ const academicoService = require('../services/academico.service');
 const supabase = require('../services/supabase.service');
 const AppError = require('../utils/AppError');
 const estudianteService = require('../services/estudiante.service');
-const firebaseStorage = require('../services/firebase-storage.service');
 
 const ok = (res, data, message) => res.json({ ok: true, message, data });
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -44,13 +43,22 @@ const subirPortadaCurso = async (req, res) => {
   const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `curso-portadas/${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${safeName}`;
 
-  const upload = await firebaseStorage.uploadPublicFile({
-    buffer: req.file.buffer,
+  const { error } = await supabase.storage.from('lms-recursos').upload(storagePath, req.file.buffer, {
     contentType: req.file.mimetype,
-    destination: storagePath,
+    upsert: false,
   });
+  if (error) throw new AppError('No se pudo subir la portada a Supabase', 500, error.message);
 
-  res.status(201).json({ ok: true, data: upload });
+  const { data: publicData } = supabase.storage.from('lms-recursos').getPublicUrl(storagePath);
+
+  res.status(201).json({
+    ok: true,
+    data: {
+      bucket: 'lms-recursos',
+      path: storagePath,
+      url: publicData.publicUrl,
+    },
+  });
 };
 
 const listarModulos = async (req, res) => ok(res, await academicoService.listModulos(req.query.curso_id));

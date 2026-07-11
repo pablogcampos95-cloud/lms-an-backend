@@ -19,15 +19,9 @@ SUPABASE_KEY=tu_clave_de_supabase
 JWT_SECRET=una_clave_larga_y_segura
 JWT_EXPIRES_IN=8h
 JWT_REMEMBER_EXPIRES_IN=30d
-FIREBASE_PROJECT_ID=tu-proyecto-firebase
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@tu-proyecto-firebase.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-FIREBASE_STORAGE_BUCKET=tu-proyecto-firebase.appspot.com
 ```
 
 No uses la Service Role Key en el frontend.
-
-Las variables `FIREBASE_*` se usan para subir y servir las imagenes de portada de los cursos desde Firebase Storage.
 
 ## 3. Crear roles y usuario Admin
 
