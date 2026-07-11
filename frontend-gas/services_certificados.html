@@ -1,0 +1,22 @@
+<script>
+const CertificadosService = {
+  async listarPlantillas() {
+    return (await ApiService.request('/api/certificados/plantillas')).data || [];
+  },
+  async crearPlantilla(payload) {
+    return (await ApiService.request('/api/certificados/plantillas', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })).data;
+  },
+  async actualizarPlantilla(id, payload) {
+    return (await ApiService.request(`/api/certificados/plantillas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })).data;
+  },
+  async eliminarPlantilla(id) {
+    return (await ApiService.request(`/api/certificados/plantillas/${id}`, { method: 'DELETE' })).data;
+  },
+};
+</script>

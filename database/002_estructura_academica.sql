@@ -10,6 +10,8 @@ create table if not exists public.cursos (
   categoria text,
   campana_area text,
   duracion_estimada_min integer not null default 0 check (duracion_estimada_min >= 0),
+  modulos_planificados integer not null default 0 check (modulos_planificados >= 0),
+  pasos_planificados integer not null default 0 check (pasos_planificados >= 0),
   es_gratis boolean not null default false,
   estado text not null default 'Borrador' check (estado in ('Borrador', 'Publicado', 'Inactivo')),
   creado_por bigint references public.usuarios(id),

@@ -6,7 +6,8 @@ const AppError = require('../utils/AppError');
 
 const ESTADOS = ['Borrador', 'Publicado', 'Inactivo'];
 const TIPOS_CONTENIDO = ['Texto', 'URL', 'HTML', 'Archivo', 'Video', 'Evaluacion'];
-const PUBLIC_COURSE_FIELDS = 'id,nombre,descripcion_corta,descripcion_completa,imagen_portada_url,categoria,campana_area,duracion_estimada_min,es_gratis,estado,created_at,modulos(count)';
+const PUBLIC_COURSE_FIELDS = 'id,nombre,descripcion_corta,descripcion_completa,imagen_portada_url,categoria,campana_area,duracion_estimada_min,modulos_planificados,pasos_planificados,es_gratis,estado,created_at,modulos(count)';
+const OPTIONAL_COURSE_COLUMNS = ['es_gratis', 'modulos_planificados', 'pasos_planificados'];
 
 const throwSupabaseError = (error, message = 'Error al consultar Supabase') => {
   if (!error) return;
@@ -19,6 +20,28 @@ const isMissingColumnError = (error, column) => {
   const message = [error && error.message, error && error.details].filter(Boolean).join(' ');
   return new RegExp(`Could not find the '${column}' column|column (?:\\w+\\.)?"?${column}"? does not exist|schema cache`, 'i').test(message);
 };
+
+const isMissingOptionalCourseColumn = (error) => OPTIONAL_COURSE_COLUMNS.some((column) => isMissingColumnError(error, column));
+
+const stripOptionalCourseColumns = (payload) => {
+  const clean = { ...payload };
+  OPTIONAL_COURSE_COLUMNS.forEach((column) => delete clean[column]);
+  return clean;
+};
+
+const withCourseDefaults = (curso) => ({
+  ...curso,
+  es_gratis: curso.es_gratis === true,
+  modulos_planificados: Number(curso.modulos_planificados || 0),
+  pasos_planificados: Number(curso.pasos_planificados || 0),
+});
+
+const prepareCoursePayload = (payload) => ({
+  ...payload,
+  es_gratis: payload.es_gratis === true,
+  modulos_planificados: Math.max(0, Number(payload.modulos_planificados || 0)),
+  pasos_planificados: Math.max(0, Number(payload.pasos_planificados || 0)),
+});
 
 const assertEstado = (estado) => {
   if (estado && !ESTADOS.includes(estado)) throw new AppError('Estado academico invalido', 400);
@@ -77,16 +100,16 @@ const listPublicCourses = async ({ categoria, search } = {}) => {
   if (categoria) query = query.eq('categoria', categoria);
   if (search) query = query.ilike('nombre', `%${search}%`);
   let { data, error } = await query;
-  if (isMissingColumnError(error, 'es_gratis')) {
+  if (isMissingOptionalCourseColumn(error)) {
     let fallbackQuery = supabase
       .from('cursos')
-      .select(PUBLIC_COURSE_FIELDS.replace(',es_gratis', ''))
+      .select(OPTIONAL_COURSE_COLUMNS.reduce((fields, column) => fields.replace(`,${column}`, ''), PUBLIC_COURSE_FIELDS))
       .eq('estado', 'Publicado')
       .order('created_at', { ascending: false });
     if (categoria) fallbackQuery = fallbackQuery.eq('categoria', categoria);
     if (search) fallbackQuery = fallbackQuery.ilike('nombre', `%${search}%`);
     const fallback = await fallbackQuery;
-    data = (fallback.data || []).map((curso) => ({ ...curso, es_gratis: false }));
+    data = (fallback.data || []).map(withCourseDefaults);
     error = fallback.error;
   }
   throwSupabaseError(error);
@@ -185,40 +208,37 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
 const createCurso = async (payload, userId) => {
   assertEstado(payload.estado);
   if (!payload.nombre || !payload.nombre.trim()) throw new AppError('El nombre del curso es obligatorio', 400);
-  const cursoPayload = { ...payload, es_gratis: payload.es_gratis === true };
+  const cursoPayload = prepareCoursePayload(payload);
   const { data, error } = await supabase
     .from('cursos')
     .insert({ ...cursoPayload, nombre: payload.nombre.trim(), creado_por: userId })
     .select('*')
     .single();
-  if (isMissingColumnError(error, 'es_gratis')) {
-    const { es_gratis, ...fallbackPayload } = cursoPayload;
+  if (isMissingOptionalCourseColumn(error)) {
+    const fallbackPayload = stripOptionalCourseColumns(cursoPayload);
     const fallback = await supabase
       .from('cursos')
       .insert({ ...fallbackPayload, nombre: payload.nombre.trim(), creado_por: userId })
       .select('*')
       .single();
     throwSupabaseError(fallback.error);
-    return { ...fallback.data, es_gratis: false };
+    return withCourseDefaults(fallback.data);
   }
   throwSupabaseError(error);
-  return data;
+  return withCourseDefaults(data);
 };
 
 const updateCurso = async (id, payload) => {
   assertEstado(payload.estado);
-  const cursoPayload = { ...payload };
-  if (Object.prototype.hasOwnProperty.call(cursoPayload, 'es_gratis')) {
-    cursoPayload.es_gratis = cursoPayload.es_gratis === true;
-  }
+  const cursoPayload = prepareCoursePayload(payload);
   const { data, error } = await supabase
     .from('cursos')
     .update({ ...cursoPayload, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select('*')
     .maybeSingle();
-  if (isMissingColumnError(error, 'es_gratis')) {
-    const { es_gratis, ...fallbackPayload } = cursoPayload;
+  if (isMissingOptionalCourseColumn(error)) {
+    const fallbackPayload = stripOptionalCourseColumns(cursoPayload);
     const fallback = await supabase
       .from('cursos')
       .update({ ...fallbackPayload, updated_at: new Date().toISOString() })
@@ -227,11 +247,11 @@ const updateCurso = async (id, payload) => {
       .maybeSingle();
     throwSupabaseError(fallback.error);
     if (!fallback.data) throw new AppError('Curso no encontrado', 404);
-    return { ...fallback.data, es_gratis: false };
+    return withCourseDefaults(fallback.data);
   }
   throwSupabaseError(error);
   if (!data) throw new AppError('Curso no encontrado', 404);
-  return data;
+  return withCourseDefaults(data);
 };
 
 const deleteCurso = async (id) => {

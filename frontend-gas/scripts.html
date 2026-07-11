@@ -12,6 +12,8 @@ const AppState = {
   lessonModal: null,
   coursePreviewModal: null,
   courseAssignmentModal: null,
+  certificateTemplateModal: null,
+  certificateTemplates: [],
   studentLessons: [],
   studentLessonIndex: 0,
   studentOutlineOpen: true,
@@ -97,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
   AppState.coursePreviewModal = new bootstrap.Modal(document.getElementById('coursePreviewModal'));
   AppState.courseAssignmentModal = new bootstrap.Modal(document.getElementById('courseAssignmentModal'));
+  AppState.certificateTemplateModal = new bootstrap.Modal(document.getElementById('certificateTemplateModal'));
   AppState.evaluationModal = new bootstrap.Modal(document.getElementById('evaluationModal'));
   AppState.takeEvaluationModal = new bootstrap.Modal(document.getElementById('takeEvaluationModal'));
   AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
@@ -140,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('previewCourse').addEventListener('click', previewCurrentCourse);
   document.getElementById('assignCourseStudents').addEventListener('click', openCourseAssignmentModal);
   document.getElementById('saveCourseAssignments').addEventListener('click', saveCourseAssignments);
+  document.getElementById('certificateTemplateForm').addEventListener('submit', saveCertificateTemplate);
   document.getElementById('evaluationForm').addEventListener('submit', saveEvaluation);
   document.getElementById('takeEvaluationForm').addEventListener('submit', submitEvaluationAttempt);
   document.getElementById('forumForm').addEventListener('submit', saveForum);
@@ -247,7 +251,10 @@ function configureRoleInterface() {
   document.getElementById('createCertificateButton').classList.toggle('d-none', student);
   document.getElementById('createForumButton').classList.toggle('d-none', student);
   document.getElementById('evaluationAdminFilters').classList.toggle('d-none', student);
-  document.querySelector('#view-certificados .row').classList.toggle('d-none', student);
+  const certificateAdminPanel = document.getElementById('certificateAdminPanel');
+  const certificateStudentPanel = document.getElementById('certificatesContent');
+  if (certificateAdminPanel) certificateAdminPanel.classList.toggle('d-none', student);
+  if (certificateStudentPanel) certificateStudentPanel.classList.toggle('d-none', !student);
   document.getElementById('openCourseModal').classList.toggle('d-none', !canManageCourses());
   const navButtons = document.querySelectorAll('.main-navigation button');
   navButtons.forEach((button) => {
@@ -910,6 +917,7 @@ function showView(viewName) {
   if (isStudent() && viewName === 'student-courses') loadStudentCourses();
   if (viewName === 'evaluaciones') loadEvaluations();
   if (isStudent() && viewName === 'certificados') loadStudentCertificates();
+  if (!isStudent() && viewName === 'certificados') loadCertificateTemplates();
 }
 
 function showCoursesHome() {
@@ -1402,6 +1410,134 @@ async function loadStudentCertificates() {
   } catch (error) { container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`; }
 }
 
+async function loadCertificateTemplates() {
+  const container = document.getElementById('certificateTemplatesContent');
+  if (!container) return;
+  container.className = 'certificate-template-grid empty-state';
+  container.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    if (!AppState.cursos.length) await loadCourses();
+    AppState.certificateTemplates = await CertificadosService.listarPlantillas();
+    renderCertificateTemplates();
+  } catch (error) {
+    container.innerHTML = `<div class="text-warning">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderCertificateTemplates() {
+  const templates = AppState.certificateTemplates || [];
+  const container = document.getElementById('certificateTemplatesContent');
+  if (!container) return;
+  const activeCount = templates.filter((template) => template.activo !== false).length;
+  const linkedCourses = new Set(templates.filter((template) => template.curso_id).map((template) => template.curso_id)).size;
+  document.getElementById('certificateTemplateCount').textContent = templates.length;
+  document.getElementById('certificateActiveTemplateCount').textContent = activeCount;
+  document.getElementById('certificateLinkedCoursesCount').textContent = linkedCourses;
+
+  if (!templates.length) {
+    container.className = 'empty-state';
+    container.innerHTML = '<i class="fa-solid fa-award fa-2x mb-3"></i><div class="fw-semibold">Aun no hay plantillas</div><small>Crea una plantilla para comenzar a emitir certificados con identidad visual propia.</small>';
+    return;
+  }
+
+  container.className = 'certificate-template-grid';
+  container.innerHTML = templates.map((template) => `
+    <article class="certificate-template-card">
+      <div class="certificate-template-preview" style="--certificate-accent:${escapeHtml(template.color_principal || '#00d8ff')}; ${template.fondo_url ? `background-image: linear-gradient(135deg, rgba(3,13,33,.84), rgba(3,13,33,.94)), url('${escapeHtml(template.fondo_url)}');` : ''}">
+        <span>Certificado</span>
+        <strong>${escapeHtml(template.titulo)}</strong>
+        <small>${escapeHtml(template.subtitulo || 'IA Learning Solutions')}</small>
+      </div>
+      <div class="certificate-template-body">
+        <div>
+          <span class="badge ${template.activo !== false ? 'text-bg-success' : 'text-bg-secondary'}">${template.activo !== false ? 'Activa' : 'Inactiva'}</span>
+          <h3>${escapeHtml(template.nombre)}</h3>
+          <p>${escapeHtml(template.curso ? template.curso.nombre : 'Plantilla general')}</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-info btn-sm" type="button" onclick="openCertificateTemplateModal(${template.id})"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-outline-danger btn-sm" type="button" onclick="deleteCertificateTemplate(${template.id})"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    </article>
+  `).join('');
+}
+
+function populateCertificateCourseOptions(selectedId = '') {
+  const select = document.getElementById('certificateTemplateCourse');
+  select.innerHTML = '<option value="">General</option>' + AppState.cursos.map((curso) => (
+    `<option value="${curso.id}" ${Number(selectedId) === Number(curso.id) ? 'selected' : ''}>${escapeHtml(curso.nombre)}</option>`
+  )).join('');
+}
+
+async function openCertificateTemplateModal(id = null) {
+  if (!AppState.cursos.length) await loadCourses();
+  const template = id ? AppState.certificateTemplates.find((item) => Number(item.id) === Number(id)) : null;
+  document.getElementById('certificateTemplateModalTitle').textContent = template ? 'Editar plantilla' : 'Nueva plantilla';
+  document.getElementById('certificateTemplateId').value = template ? template.id : '';
+  document.getElementById('certificateTemplateName').value = template ? template.nombre : '';
+  document.getElementById('certificateTemplateDescription').value = template ? template.descripcion || '' : '';
+  document.getElementById('certificateTemplateTitle').value = template ? template.titulo : 'Certificado de finalizacion';
+  document.getElementById('certificateTemplateSubtitle').value = template ? template.subtitulo || '' : 'Otorgado por IA Learning Solutions';
+  document.getElementById('certificateTemplateBody').value = template ? template.cuerpo || '' : 'Se certifica que {{nombre}} completo satisfactoriamente el curso {{curso}}.';
+  document.getElementById('certificateTemplateSigner').value = template ? template.firma_nombre || '' : '';
+  document.getElementById('certificateTemplateSignerRole').value = template ? template.firma_cargo || '' : '';
+  document.getElementById('certificateTemplateColor').value = template ? template.color_principal || '#00d8ff' : '#00d8ff';
+  document.getElementById('certificateTemplateBackground').value = template ? template.fondo_url || '' : '';
+  document.getElementById('certificateTemplateActive').checked = template ? template.activo !== false : true;
+  populateCertificateCourseOptions(template ? template.curso_id : '');
+  AppState.certificateTemplateModal.show();
+}
+
+function getCertificateTemplatePayload() {
+  return {
+    nombre: document.getElementById('certificateTemplateName').value,
+    descripcion: document.getElementById('certificateTemplateDescription').value,
+    curso_id: document.getElementById('certificateTemplateCourse').value || null,
+    titulo: document.getElementById('certificateTemplateTitle').value,
+    subtitulo: document.getElementById('certificateTemplateSubtitle').value,
+    cuerpo: document.getElementById('certificateTemplateBody').value,
+    firma_nombre: document.getElementById('certificateTemplateSigner').value,
+    firma_cargo: document.getElementById('certificateTemplateSignerRole').value,
+    color_principal: document.getElementById('certificateTemplateColor').value,
+    fondo_url: document.getElementById('certificateTemplateBackground').value,
+    activo: document.getElementById('certificateTemplateActive').checked,
+  };
+}
+
+async function saveCertificateTemplate(event) {
+  event.preventDefault();
+  const id = document.getElementById('certificateTemplateId').value;
+  try {
+    if (id) await CertificadosService.actualizarPlantilla(id, getCertificateTemplatePayload());
+    else await CertificadosService.crearPlantilla(getCertificateTemplatePayload());
+    AppState.certificateTemplateModal.hide();
+    await loadCertificateTemplates();
+    toastSuccess('Plantilla guardada');
+  } catch (error) {
+    Swal.fire('No se pudo guardar', error.message, 'error');
+  }
+}
+
+async function deleteCertificateTemplate(id) {
+  const result = await Swal.fire({
+    title: 'Eliminar plantilla',
+    text: 'Esta accion no elimina certificados ya emitidos.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar',
+  });
+  if (!result.isConfirmed) return;
+  try {
+    await CertificadosService.eliminarPlantilla(id);
+    await loadCertificateTemplates();
+    toastSuccess('Plantilla eliminada');
+  } catch (error) {
+    Swal.fire('No se pudo eliminar', error.message, 'error');
+  }
+}
+
 function renderProgressChart(data) {
   const canvas = document.getElementById('progressChart');
   if (AppState.chart) AppState.chart.destroy();
@@ -1719,6 +1855,12 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleDateString('es-PE') : '-';
 }
 
+function formatDurationHours(minutes = 0) {
+  const hours = Number(minutes || 0) / 60;
+  if (!hours) return '0 horas';
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hora${hours === 1 ? '' : 's'}`;
+}
+
 function openCreateCourseModal() {
   document.getElementById('courseModalTitle').textContent = 'Crear curso';
   document.getElementById('courseForm').reset();
@@ -1727,6 +1869,9 @@ function openCreateCourseModal() {
   clearCourseCoverPreview();
   document.getElementById('courseStatus').value = 'Borrador';
   document.getElementById('courseIsFree').checked = false;
+  document.getElementById('courseDurationHours').value = 0;
+  document.getElementById('coursePlannedModules').value = 0;
+  document.getElementById('coursePlannedLessons').value = 0;
   AppState.courseModal.show();
 }
 
@@ -1781,7 +1926,9 @@ function fillCourseForm(curso) {
   setCourseCoverPreview(curso.imagen_portada_url, 'Portada actual');
   document.getElementById('courseCategory').value = curso.categoria || '';
   document.getElementById('courseArea').value = curso.campana_area || '';
-  document.getElementById('courseDuration').value = curso.duracion_estimada_min || 0;
+  document.getElementById('courseDurationHours').value = Number(curso.duracion_estimada_min || 0) / 60;
+  document.getElementById('coursePlannedModules').value = curso.modulos_planificados || curso.cantidad_modulos || 0;
+  document.getElementById('coursePlannedLessons').value = curso.pasos_planificados || 0;
   document.getElementById('courseStatus').value = curso.estado || 'Borrador';
   document.getElementById('courseIsFree').checked = curso.es_gratis === true;
 }
@@ -1803,7 +1950,9 @@ function getCoursePayload() {
     imagen_portada_url: document.getElementById('courseImage').value.trim() || null,
     categoria: document.getElementById('courseCategory').value.trim(),
     campana_area: document.getElementById('courseArea').value.trim(),
-    duracion_estimada_min: Number(document.getElementById('courseDuration').value || 0),
+    duracion_estimada_min: Math.round(Number(document.getElementById('courseDurationHours').value || 0) * 60),
+    modulos_planificados: Number(document.getElementById('coursePlannedModules').value || 0),
+    pasos_planificados: Number(document.getElementById('coursePlannedLessons').value || 0),
     es_gratis: document.getElementById('courseIsFree').checked,
     estado: document.getElementById('courseStatus').value,
   };
@@ -1863,7 +2012,7 @@ async function openCourseEditor(id) {
     document.getElementById('courseInfoSummary').innerHTML = `
       <div class="row g-4 align-items-center">
         ${AppState.cursoActual.imagen_portada_url ? `<div class="col-md-3"><img class="course-cover" src="${escapeHtml(AppState.cursoActual.imagen_portada_url)}" alt="Portada"></div>` : ''}
-        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge ${AppState.cursoActual.es_gratis === true ? 'text-bg-info' : 'badge-soft'}">${AppState.cursoActual.es_gratis === true ? 'Gratis' : 'No gratis'}</span><span class="badge badge-soft">${escapeHtml(AppState.cursoActual.categoria || 'Sin categoria')}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${AppState.cursoActual.duracion_estimada_min || 0} minutos</small></div>
+        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge ${AppState.cursoActual.es_gratis === true ? 'text-bg-info' : 'badge-soft'}">${AppState.cursoActual.es_gratis === true ? 'Gratis' : 'No gratis'}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${formatDurationHours(AppState.cursoActual.duracion_estimada_min)} · Modulos estimados: ${Number(AppState.cursoActual.modulos_planificados || AppState.cursoActual.cantidad_modulos || 0)} · Pasos estimados: ${Number(AppState.cursoActual.pasos_planificados || 0)}</small></div>
       </div>`;
     renderModulesEditor();
   } catch (error) { Swal.fire('No se pudo cargar el curso', error.message, 'error'); }
