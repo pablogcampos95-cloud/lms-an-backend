@@ -108,6 +108,13 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
   AppState.forumResponseModal = new bootstrap.Modal(document.getElementById('forumResponseModal'));
   AppState.publicRegisterModal = new bootstrap.Modal(document.getElementById('publicRegisterModal'));
+  const coursePreviewElement = document.getElementById('coursePreviewModal');
+  coursePreviewElement.addEventListener('hide.bs.modal', () => stopPlaybackInElement(coursePreviewElement));
+  coursePreviewElement.addEventListener('hidden.bs.modal', () => {
+    stopPlaybackInElement(coursePreviewElement);
+    document.getElementById('coursePreviewBody').innerHTML = '';
+    if (AppState.previewMode) AppState.previewMode = false;
+  });
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('openPublicLogin').addEventListener('click', showLogin);
@@ -2324,6 +2331,22 @@ function renderVideoPlayer(recurso) {
   return `<div class="lesson-video-shell"><video class="lesson-video-player" src="${escapeHtml(recurso.url)}" controls preload="metadata" playsinline></video><a class="btn btn-outline-light btn-sm mt-3" href="${escapeHtml(recurso.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Abrir video en otra pestana</a></div>`;
 }
 
+function stopPlaybackInElement(root) {
+  if (!root) return;
+  root.querySelectorAll('video, audio').forEach((media) => {
+    try {
+      media.pause();
+      media.currentTime = 0;
+    } catch (error) {
+      console.warn('No se pudo detener el medio', error);
+    }
+  });
+  root.querySelectorAll('iframe').forEach((iframe) => {
+    const src = iframe.getAttribute('src');
+    if (src && src !== 'about:blank') iframe.setAttribute('src', 'about:blank');
+  });
+}
+
 async function confirmAction(title, text) { const result = await Swal.fire({ title, text, icon: 'warning', showCancelButton: true, confirmButtonText: 'Confirmar', cancelButtonText: 'Cancelar' }); return result.isConfirmed; }
 function toastSuccess(title) { Swal.fire({ toast: true, position: 'top-end', timer: 2200, showConfirmButton: false, icon: 'success', title }); }
 
@@ -2346,6 +2369,7 @@ function getStudentPlayerContainer() {
 }
 
 function renderStudentCoursePlayer() {
+  stopPlaybackInElement(getStudentPlayerContainer());
   const leccion = AppState.studentLessons[AppState.studentLessonIndex];
   const curso = AppState.cursoActual;
   const container = getStudentPlayerContainer();
