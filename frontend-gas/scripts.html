@@ -30,6 +30,7 @@ const AppState = {
   forumModal: null,
   forumResponseModal: null,
   currentAttempt: null,
+  integratedEvaluationAttempts: {},
   evaluationHasAttempts: false,
   publicCourses: [],
   publicHomeConfig: null,
@@ -1379,9 +1380,9 @@ async function showEvaluationResults(id) {
 }
 async function gradeManualAnswer(id) { try { await EvaluacionesService.calificarRespuesta(id,{puntaje:Number(document.getElementById(`grade-score-${id}`).value),retroalimentacion:document.getElementById(`grade-feedback-${id}`).value}); toastSuccess('Respuesta calificada'); Swal.close(); } catch(error){ Swal.fire('No se pudo calificar',error.message,'error'); } }
 
-async function takeEvaluation(id) { try { const data = await EvaluacionesService.iniciar(id); AppState.currentAttempt = data; const evaluation = data.evaluacion; document.getElementById('takeEvaluationTitle').textContent = evaluation.titulo; document.getElementById('takeEvaluationMeta').textContent = `${evaluation.curso.nombre} / Intento ${data.intento.numero_intento} de ${evaluation.intentos_permitidos}`; document.getElementById('takeEvaluationBody').innerHTML = evaluation.preguntas.map((question,index) => `<article class="take-question" data-question-id="${question.id}" data-question-type="${question.tipo}"><div class="take-question-heading"><span>${index+1}</span><div><h3>${escapeHtml(question.enunciado)}</h3><small>${question.puntaje} punto(s)</small></div></div>${renderStudentQuestion(question)}</article>`).join(''); AppState.takeEvaluationModal.show(); } catch(error){ Swal.fire('No se pudo iniciar',error.message,'error'); } }
+async function takeEvaluation(id) { try { const data = await EvaluacionesService.iniciar(id); AppState.currentAttempt = data; const evaluation = data.evaluacion; document.getElementById('takeEvaluationTitle').textContent = evaluation.titulo; document.getElementById('takeEvaluationMeta').textContent = `${evaluation.curso.nombre} / Intento ${data.intento.numero_intento} de ${evaluation.intentos_permitidos}`; document.getElementById('takeEvaluationBody').innerHTML = renderEvaluationQuestions(evaluation); AppState.takeEvaluationModal.show(); } catch(error){ Swal.fire('No se pudo iniciar',error.message,'error'); } }
 function renderStudentQuestion(question) { if (question.tipo === 'TextoLargo') return '<textarea class="form-control student-answer-text" rows="6" required></textarea>'; if (question.tipo === 'TextoCorto') return '<input class="form-control student-answer-text" required>'; return `<div class="student-answer-options">${question.opciones.map((option) => `<label><input class="form-check-input student-answer-option" type="${question.tipo === 'OpcionMultiple' ? 'checkbox' : 'radio'}" name="question-${question.id}" value="${option.id}"><span>${escapeHtml(option.texto)}</span></label>`).join('')}</div>`; }
-async function submitEvaluationAttempt(event) { event.preventDefault(); const answers = Array.from(document.querySelectorAll('.take-question')).map((card) => { const type = card.dataset.questionType; const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value)); return { pregunta_id: Number(card.dataset.questionId), opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null, opciones_ids: type === 'OpcionMultiple' ? checked : null, respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null }; }); try { const result = await EvaluacionesService.enviar(AppState.currentAttempt.evaluacion.id,AppState.currentAttempt.intento.id,answers); AppState.takeEvaluationModal.hide(); await loadEvaluations(); Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : result.estado === 'PendienteCalificacion' ? 'Enviada para revision' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info'); } catch(error){ Swal.fire('No se pudo enviar',error.message,'error'); } }
+async function submitEvaluationAttempt(event) { event.preventDefault(); const answers = Array.from(event.currentTarget.querySelectorAll('.take-question')).map((card) => { const type = card.dataset.questionType; const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value)); return { pregunta_id: Number(card.dataset.questionId), opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null, opciones_ids: type === 'OpcionMultiple' ? checked : null, respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null }; }); try { const result = await EvaluacionesService.enviar(AppState.currentAttempt.evaluacion.id,AppState.currentAttempt.intento.id,answers); AppState.takeEvaluationModal.hide(); await loadEvaluations(); Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : result.estado === 'PendienteCalificacion' ? 'Enviada para revision' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info'); } catch(error){ Swal.fire('No se pudo enviar',error.message,'error'); } }
 function viewEvaluationResult(id) { const item = AppState.evaluaciones.find((evaluation) => evaluation.id === id); const attempt = item && item.ultimo_intento; Swal.fire({ icon: attempt && attempt.estado === 'Aprobado' ? 'success' : 'info', title: item ? item.titulo : 'Resultado', html: attempt ? `<p>Estado: <strong>${escapeHtml(attempt.estado)}</strong></p><div class="display-4">${Number(attempt.porcentaje || 0)}%</div>` : 'Sin resultado disponible' }); }
 
 function renderForums() {
@@ -2478,12 +2479,15 @@ function renderStudentCoursePlayer() {
         <main class="student-player-content">
           ${isOutlineOpen ? '' : '<button class="student-outline-toggle" type="button" onclick="toggleStudentOutline(true)"><i class="fa-solid fa-list-check me-2"></i>Mostrar contenido del curso</button>'}
           ${activityContent}
-          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Foro' ? '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Foro' ? '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Evaluacion' ? '<span class="preview-mode-label"><i class="fa-solid fa-clipboard-check"></i> Responde la evaluacion en esta seccion</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
         </main>
       </div>
     </div>`;
   if (leccion.es_actividad && leccion.tipo_actividad === 'Foro') {
     setTimeout(() => loadForumWorkspace(leccion.id, `integratedForum-${leccion.id}`, { preview: AppState.previewMode }), 0);
+  }
+  if (leccion.es_actividad && leccion.tipo_actividad === 'Evaluacion') {
+    setTimeout(() => loadIntegratedEvaluation(leccion.id), 0);
   }
 }
 
@@ -2493,8 +2497,75 @@ function toggleStudentOutline(open) {
 }
 
 function journeyActivityState(activity) { const record=activity.tipo_actividad==='Foro'?activity.respuesta:activity.intento;if(activity.completada)return{label:activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Aprobado'?'Aprobada':'Completado',className:'text-success',icon:'fa-circle-check',message:''};if(record&&((activity.tipo_actividad==='Evaluacion'&&record.estado==='PendienteCalificacion')||(activity.tipo_actividad==='Foro'&&record.estado!=='Calificado'&&activity.condicion_desbloqueo!=='Responder')))return{label:'Pendiente de calificacion',className:'text-warning',icon:'fa-clock',message:activity.tipo_actividad==='Foro'?'Tu respuesta esta pendiente de revision por el instructor.':'Tu evaluacion esta pendiente de revision por el instructor.'};if(activity.tipo_actividad==='Evaluacion'&&record&&record.estado==='Desaprobado')return{label:'Desaprobada',className:'text-danger',icon:'fa-circle-xmark',message:activity.bloquea_avance?'Debes aprobar esta evaluacion para continuar.':''};return{label:activity.bloqueado?'Bloqueado':'Disponible',className:activity.bloqueado?'text-warning':'text-info',icon:activity.bloqueado?'fa-lock':'fa-circle-play',message:activity.bloquea_avance?(activity.mensaje_bloqueo||(activity.tipo_actividad==='Foro'?'Debes completar este foro para continuar.':'Debes completar esta evaluacion para continuar.')):''}; }
-function renderJourneyActivity(activity) { const state=journeyActivityState(activity);if(activity.tipo_actividad==='Foro')return `<div id="integratedForum-${activity.id}" class="integrated-forum"><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando foro...</div></div>`;return `<div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div><div><span class="eyebrow">EVALUACION${activity.obligatoria ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p><span class="${state.className}"><i class="fa-solid ${state.icon} me-2"></i>${state.label}</span>${state.message?`<p class="mt-2 mb-0 ${state.className}">${escapeHtml(state.message)}</p>`:''}</div></div>`; }
-function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; if (activity.tipo_actividad === 'Foro') { loadForumWorkspace(activity.id, `integratedForum-${activity.id}`); } else takeEvaluation(activity.id); }
+function renderJourneyActivity(activity) { const state=journeyActivityState(activity);if(activity.tipo_actividad==='Foro')return `<div id="integratedForum-${activity.id}" class="integrated-forum"><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando foro...</div></div>`;return `<section id="integratedEvaluation-${activity.id}" class="student-integrated-evaluation"><div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div><div><span class="eyebrow">EVALUACION${activity.obligatoria ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p><span class="${state.className}"><i class="fa-solid ${state.icon} me-2"></i>${state.label}</span>${state.message?`<p class="mt-2 mb-0 ${state.className}">${escapeHtml(state.message)}</p>`:''}</div></div><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando evaluacion...</div></section>`; }
+function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; if (activity.tipo_actividad === 'Foro') { loadForumWorkspace(activity.id, `integratedForum-${activity.id}`); } else loadIntegratedEvaluation(activity.id); }
+
+function renderEvaluationQuestions(evaluation) {
+  return (evaluation.preguntas || []).map((question,index) => `<article class="take-question" data-question-id="${question.id}" data-question-type="${question.tipo}"><div class="take-question-heading"><span>${index+1}</span><div><h3>${escapeHtml(question.enunciado)}</h3><small>${question.puntaje} punto(s)</small></div></div>${renderStudentQuestion(question)}</article>`).join('');
+}
+
+async function loadIntegratedEvaluation(id) {
+  const target = document.getElementById(`integratedEvaluation-${id}`);
+  if (!target) return;
+  if (AppState.previewMode) {
+    target.innerHTML = `<div class="journey-activity"><div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div><div><span class="eyebrow">EVALUACION / VISTA PREVIA</span><h2>Evaluacion disponible</h2><p>En modo estudiante, las preguntas apareceran aqui para responder sin abrir otra ventana.</p><span class="text-info"><i class="fa-solid fa-eye me-2"></i>Navegacion de prueba</span></div></div>`;
+    return;
+  }
+  try {
+    const data = await EvaluacionesService.iniciar(id);
+    AppState.integratedEvaluationAttempts[id] = data;
+    const evaluation = data.evaluacion;
+    const attempt = data.intento;
+    const isFinished = attempt && ['Aprobado','Desaprobado','PendienteCalificacion','Enviado'].includes(attempt.estado);
+    const status = isFinished ? `<div class="evaluation-result-strip"><span>${escapeHtml(attempt.estado)}</span><strong>${Number(attempt.porcentaje || 0)}%</strong></div>` : '';
+    target.innerHTML = `
+      <div class="journey-activity ${isFinished ? 'completed' : ''}">
+        <div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+        <div>
+          <span class="eyebrow">EVALUACION${evaluation.obligatoria ? ' / OBLIGATORIA' : ''}</span>
+          <h2>${escapeHtml(evaluation.titulo)}</h2>
+          <p>${escapeHtml(evaluation.descripcion || 'Responde las preguntas para completar esta actividad.')}</p>
+          <span class="${isFinished ? 'text-success' : 'text-info'}"><i class="fa-solid ${isFinished ? 'fa-circle-check' : 'fa-circle-play'} me-2"></i>${isFinished ? 'Evaluacion enviada' : 'Lista para responder'}</span>
+          ${status}
+        </div>
+      </div>
+      ${isFinished ? '<div class="alert alert-info mb-0">Ya registramos tu evaluacion. Puedes continuar con el siguiente paso.</div>' : `<form class="student-integrated-evaluation-form" onsubmit="submitIntegratedEvaluationAttempt(event, ${id})">${renderEvaluationQuestions(evaluation)}<div class="student-integrated-evaluation-actions"><small>Intento ${attempt.numero_intento} de ${evaluation.intentos_permitidos}</small><button class="btn btn-gold" type="submit"><i class="fa-solid fa-paper-plane me-2"></i>Enviar evaluacion</button></div></form>`}`;
+  } catch(error) {
+    target.innerHTML = `<div class="alert alert-warning mb-0"><strong>No se pudo cargar la evaluacion.</strong><br>${escapeHtml(error.message || 'Intenta nuevamente en unos segundos.')}</div>`;
+  }
+}
+
+async function submitIntegratedEvaluationAttempt(event, id) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const attemptData = AppState.integratedEvaluationAttempts[id];
+  if (!attemptData) return;
+  const button = form.querySelector('button[type="submit"]');
+  if (button) { button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...'; }
+  const answers = Array.from(form.querySelectorAll('.take-question')).map((card) => {
+    const type = card.dataset.questionType;
+    const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value));
+    return {
+      pregunta_id: Number(card.dataset.questionId),
+      opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null,
+      opciones_ids: type === 'OpcionMultiple' ? checked : null,
+      respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null,
+    };
+  });
+  try {
+    const result = await EvaluacionesService.enviar(attemptData.evaluacion.id, attemptData.intento.id, answers);
+    const lesson = AppState.studentLessons[AppState.studentLessonIndex];
+    if (lesson && Number(lesson.id) === Number(id)) {
+      lesson.intento = result;
+      lesson.completada = ['Aprobado','Enviado','PendienteCalificacion'].includes(result.estado);
+    }
+    await loadIntegratedEvaluation(id);
+    Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info');
+  } catch(error) {
+    Swal.fire('No se pudo enviar', error.message, 'error');
+    if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-paper-plane me-2"></i>Enviar evaluacion'; }
+  }
+}
 
 function renderStudentCourseOutline() {
   let lastModule = '';
