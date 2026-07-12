@@ -9,6 +9,8 @@ const router = Router();
 
 router.post('/login', validateLogin, asyncHandler(authController.login));
 router.post('/register-public', asyncHandler(authController.registerPublic));
+router.post('/magic-link', asyncHandler(authController.requestMagicLink));
+router.post('/magic-session', asyncHandler(authController.completeMagicLink));
 router.get('/google/config', asyncHandler(authController.googleConfig));
 router.post('/google', asyncHandler(authController.google));
 router.get('/me', requireAuth, asyncHandler(authController.me));

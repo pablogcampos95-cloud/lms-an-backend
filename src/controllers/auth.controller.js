@@ -21,6 +21,26 @@ const registerPublic = async (req, res) => {
   });
 };
 
+const requestMagicLink = async (req, res) => {
+  const result = await authService.requestMagicLink(req.body);
+
+  res.json({
+    ok: true,
+    data: result,
+    message: 'Enlace magico enviado correctamente',
+  });
+};
+
+const completeMagicLink = async (req, res) => {
+  const result = await authService.completeMagicLink(req.body);
+
+  res.json({
+    ok: true,
+    token: result.token,
+    usuario: result.usuario,
+  });
+};
+
 const googleConfig = async (req, res) => {
   res.json({
     ok: true,
@@ -48,6 +68,8 @@ const me = async (req, res) => {
 module.exports = {
   login,
   registerPublic,
+  requestMagicLink,
+  completeMagicLink,
   googleConfig,
   google,
   me,

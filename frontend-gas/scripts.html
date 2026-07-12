@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('openFreeCourses').addEventListener('click', scrollToFreeCourses);
   document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
   document.getElementById('publicRegisterForm').addEventListener('submit', handlePublicRegister);
-  document.getElementById('googleRegisterFallback').addEventListener('click', handleGoogleRegisterFallback);
+  document.getElementById('publicMagicLinkButton').addEventListener('click', handlePublicMagicLink);
   document.getElementById('publicCourseSearch').addEventListener('input', renderPublicCatalog);
   document.getElementById('publicHeroSearch').addEventListener('input', syncPublicHeroSearch);
   document.getElementById('publicCategoryFilter').addEventListener('change', renderPublicCatalog);
@@ -191,6 +191,8 @@ function handleExpiredSession() {
 }
 
 async function boot() {
+  if (await consumeMagicLinkCallback()) return;
+
   const token = ApiService.getToken();
   if (!token) {
     showPublicCatalog();
@@ -581,11 +583,11 @@ function promptPaidCourse(courseId) {
 
 function openPublicRegister(courseId = null) {
   AppState.pendingFreeCourseId = courseId ? Number(courseId) : null;
+  if (AppState.pendingFreeCourseId) localStorage.setItem('an_pending_free_course_id', String(AppState.pendingFreeCourseId));
   document.getElementById('publicRegisterCourseId').value = AppState.pendingFreeCourseId || '';
   document.getElementById('publicRegisterForm').reset();
   document.getElementById('publicRegisterCourseId').value = AppState.pendingFreeCourseId || '';
   AppState.publicRegisterModal.show();
-  initGoogleRegisterButton();
 }
 
 async function handlePublicRegister(event) {
@@ -614,6 +616,64 @@ async function handlePublicRegister(event) {
     button.disabled = false;
     button.innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>Registrarme gratis';
   }
+}
+
+function buildMagicRedirectUrl(courseId = null) {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  url.searchParams.set('auth', 'magic');
+  if (courseId) url.searchParams.set('curso_id', String(courseId));
+  return url.toString();
+}
+
+async function handlePublicMagicLink() {
+  const button = document.getElementById('publicMagicLinkButton');
+  const cursoId = document.getElementById('publicRegisterCourseId').value || null;
+  const payload = {
+    nombres: document.getElementById('publicRegisterName').value.trim(),
+    correo: document.getElementById('publicRegisterEmail').value.trim(),
+    dni: document.getElementById('publicRegisterDni').value.trim(),
+    usuario: document.getElementById('publicRegisterUser').value.trim(),
+    curso_id: cursoId,
+    redirect_to: buildMagicRedirectUrl(cursoId),
+  };
+
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando enlace';
+  try {
+    if (cursoId) localStorage.setItem('an_pending_free_course_id', String(cursoId));
+    await AuthService.requestMagicLink(payload);
+    Swal.fire('Revisa tu correo', 'Te enviamos un enlace seguro para entrar al LMS. Puede tardar unos segundos en llegar.', 'success');
+  } catch (error) {
+    Swal.fire('No se pudo enviar el enlace', error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="fa-solid fa-envelope-circle-check me-2"></i>Enviarme enlace magico';
+  }
+}
+
+async function consumeMagicLinkCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const accessToken = hash.get('access_token');
+  const isMagicCallback = params.get('auth') === 'magic' || hash.get('type') === 'magiclink';
+  if (!isMagicCallback || !accessToken) return false;
+
+  const courseId = params.get('curso_id') || localStorage.getItem('an_pending_free_course_id') || null;
+  window.history.replaceState({}, document.title, window.location.pathname);
+  Swal.fire({ title: 'Validando acceso', text: 'Estamos iniciando tu sesion segura.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    const sessionUser = await AuthService.completeMagicLink(accessToken, courseId);
+    localStorage.removeItem('an_pending_free_course_id');
+    await startSession(sessionUser);
+    showView('student-courses');
+    Swal.fire({ toast: true, position: 'top-end', timer: 2600, showConfirmButton: false, icon: 'success', title: 'Sesion iniciada' });
+  } catch (error) {
+    AuthService.logout();
+    showPublicCatalog();
+    Swal.fire('No se pudo iniciar sesion', error.message, 'error');
+  }
+  return true;
 }
 
 async function initGoogleRegisterButton() {

@@ -11,6 +11,22 @@ const USER_SELECT = '*, rol:roles(id,nombre,descripcion)';
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
+const isAllowedRedirectUrl = (value) => {
+  try {
+    const url = new URL(String(value || ''));
+    return ['http:', 'https:'].includes(url.protocol)
+      && (
+        url.hostname === 'localhost'
+        || url.hostname === '127.0.0.1'
+        || url.hostname.endsWith('.railway.app')
+        || url.hostname === 'ialearningsolutions.net'
+        || url.hostname === 'www.ialearningsolutions.net'
+      );
+  } catch (error) {
+    return false;
+  }
+};
+
 const getUserByCredential = async (credential) => {
   const loginValue = String(credential || '').trim();
 
@@ -164,6 +180,75 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, cu
   return signSession(user, true);
 };
 
+const requestMagicLink = async ({ nombres, correo, usuario, dni, curso_id: cursoId, redirect_to: redirectTo }) => {
+  const cleanEmail = String(correo || '').trim().toLowerCase();
+  const cleanName = String(nombres || '').trim();
+  const existing = cleanEmail ? await getUserByCredential(cleanEmail) : null;
+
+  if (!isValidEmail(cleanEmail)) throw new AppError('Ingresa un correo valido', 400);
+  if (!existing && !cleanName) throw new AppError('El nombre es obligatorio para crear la cuenta gratuita', 400);
+  await validateFreeCourse(cursoId);
+  if (!isAllowedRedirectUrl(redirectTo)) throw new AppError('La URL de retorno no es valida', 400);
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: cleanEmail,
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: redirectTo,
+      data: {
+        nombres: cleanName || existing.Nombres || cleanEmail.split('@')[0],
+        usuario: String(usuario || existing?.usuario || '').trim(),
+        dni: String(dni || existing?.DNI || '').trim(),
+        curso_id: String(cursoId || ''),
+        origen: 'catalogo_publico',
+      },
+    },
+  });
+
+  if (error) throw new AppError('No se pudo enviar el enlace magico', 500, error.message);
+
+  return { correo: cleanEmail };
+};
+
+const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId }) => {
+  const token = String(accessToken || '').trim();
+  if (!token) throw new AppError('Token de acceso no recibido', 400);
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user || !data.user.email) {
+    throw new AppError('No se pudo validar el enlace magico', 401, error ? error.message : null);
+  }
+
+  const email = String(data.user.email).trim().toLowerCase();
+  const metadata = data.user.user_metadata || {};
+  const resolvedCourseId = cursoId || metadata.curso_id || null;
+  let user = await getUserByCredential(email);
+
+  if (!user) {
+    const rolId = await getStudentRoleId();
+    const username = await uniqueUsername(metadata.usuario || email.split('@')[0]);
+    const created = await usuariosService.createUsuario({
+      DNI: String(metadata.dni || '').trim() || Date.now().toString().slice(-9),
+      Nombres: String(metadata.nombres || metadata.name || email.split('@')[0]).trim(),
+      Correo: email,
+      Cargo: 'Estudiante',
+      'CampaÃ±a': 'Cursos Gratis',
+      Supervisor: '',
+      Estado: 'Activo',
+      fecha_ingreso: new Date().toISOString().slice(0, 10),
+      usuario: username,
+      password: crypto.randomBytes(16).toString('hex'),
+      rol_id: rolId,
+      tipo_plan: 'Gratuito',
+    });
+    user = await getUserByCredential(created.usuario || username);
+  }
+
+  if (resolvedCourseId) await ensureCourseAssignment(user.id, resolvedCourseId);
+
+  return signSession(user, true);
+};
+
 const login = async ({ usuario, password, rememberMe = false }) => {
   const data = await getUserByCredential(usuario);
   const cleanPassword = typeof password === 'string' ? password.trim() : password;
@@ -240,6 +325,8 @@ const getMe = (usuario) => usuariosService.sanitizeUsuario(usuario);
 module.exports = {
   login,
   registerPublic: createPublicStudent,
+  requestMagicLink,
+  completeMagicLink,
   googleConfig,
   loginWithGoogle,
   getMe,
