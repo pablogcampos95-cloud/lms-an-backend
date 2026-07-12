@@ -27,6 +27,24 @@ const isAllowedRedirectUrl = (value) => {
   }
 };
 
+const magicLinkError = (error) => {
+  const message = String(error && error.message ? error.message : '');
+  if (/rate limit/i.test(message)) {
+    return new AppError(
+      'Supabase alcanzo el limite temporal de correos. Espera unos minutos o configura un SMTP propio para enviar mas enlaces magicos.',
+      429,
+      message
+    );
+  }
+  if (/signup|signups/i.test(message)) {
+    return new AppError('El registro por correo no esta habilitado en Supabase Auth.', 400, message);
+  }
+  if (/redirect|url/i.test(message)) {
+    return new AppError('La URL de retorno del enlace magico no esta permitida en Supabase.', 400, message);
+  }
+  return new AppError('No se pudo enviar el enlace magico', 500, message);
+};
+
 const getUserByCredential = async (credential) => {
   const loginValue = String(credential || '').trim();
 
@@ -205,7 +223,7 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, curso_id: curso
     },
   });
 
-  if (error) throw new AppError('No se pudo enviar el enlace magico', 500, error.message);
+  if (error) throw magicLinkError(error);
 
   return { correo: cleanEmail };
 };
