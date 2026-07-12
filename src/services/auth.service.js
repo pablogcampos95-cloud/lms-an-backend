@@ -232,7 +232,7 @@ const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId 
       Nombres: String(metadata.nombres || metadata.name || email.split('@')[0]).trim(),
       Correo: email,
       Cargo: 'Estudiante',
-      'CampaÃ±a': 'Cursos Gratis',
+      'Campaña': 'Cursos Gratis',
       Supervisor: '',
       Estado: 'Activo',
       fecha_ingreso: new Date().toISOString().slice(0, 10),
