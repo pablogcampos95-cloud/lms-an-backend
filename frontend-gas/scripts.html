@@ -55,6 +55,28 @@ function renderLoginContent() {
   document.getElementById('loginContentBadgeTwo').textContent = loginContent.badgeTwo;
 }
 
+const brandSwalClasses = Object.freeze({
+  container: 'ials-swal-container',
+  popup: 'ials-swal-popup',
+  title: 'ials-swal-title',
+  htmlContainer: 'ials-swal-html',
+  actions: 'ials-swal-actions',
+  confirmButton: 'ials-swal-confirm',
+  denyButton: 'ials-swal-deny',
+  cancelButton: 'ials-swal-cancel',
+});
+
+function showBrandAlert(options = {}) {
+  return Swal.fire({
+    buttonsStyling: false,
+    ...options,
+    customClass: {
+      ...brandSwalClasses,
+      ...(options.customClass || {}),
+    },
+  });
+}
+
 const MENUS = {
   Administrador: [
     ['dashboard', 'fa-chart-line', 'Dashboard'],
@@ -553,7 +575,7 @@ function syncPublicHeroSearch() {
 function promptPublicLogin(courseId) {
   const course = AppState.publicCourses.find((item) => Number(item.id) === Number(courseId));
   const courseName = course && course.nombre;
-  Swal.fire({
+  showBrandAlert({
     icon: 'info',
     title: 'Accede a cursos gratis',
     text: courseName ? `Registrate gratis o inicia sesion para acceder a "${courseName}".` : 'Registrate gratis o inicia sesion para acceder al curso.',
@@ -570,7 +592,7 @@ function promptPublicLogin(courseId) {
 
 function promptPaidCourse(courseId) {
   const course = AppState.publicCourses.find((item) => Number(item.id) === Number(courseId));
-  Swal.fire({
+  showBrandAlert({
     icon: 'info',
     title: 'Curso con acceso asignado',
     text: course && course.nombre ? `"${course.nombre}" no esta marcado como gratuito. Inicia sesion con una cuenta asignada para verlo.` : 'Este curso requiere una cuenta asignada para verlo.',
