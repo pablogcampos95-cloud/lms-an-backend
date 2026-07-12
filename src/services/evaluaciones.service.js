@@ -23,11 +23,52 @@ const assertCourseAccess = async (user, courseId) => {
   if (!ids.includes(Number(courseId))) throw new AppError('Esta actividad no pertenece a un curso asignado', 403);
 };
 
+const uniqueIds = (items, key) => [...new Set(items.map((item) => item[key]).filter(Boolean).map(Number))];
+const mapById = (items = []) => new Map(items.map((item) => [Number(item.id), item]));
+
+const hydrateEvaluationRelations = async (items, { includeCreator = false } = {}) => {
+  const evaluations = Array.isArray(items) ? items : [items];
+  if (!evaluations.length) return Array.isArray(items) ? [] : null;
+
+  const courseIds = uniqueIds(evaluations, 'curso_id');
+  const moduleIds = uniqueIds(evaluations, 'modulo_id');
+  const lessonIds = uniqueIds(evaluations, 'leccion_id');
+  const creatorIds = includeCreator ? uniqueIds(evaluations, 'creado_por') : [];
+
+  const [coursesResult, modulesResult, lessonsResult, creatorsResult] = await Promise.all([
+    courseIds.length ? supabase.from('cursos').select('id,nombre,creado_por').in('id', courseIds) : Promise.resolve({ data: [], error: null }),
+    moduleIds.length ? supabase.from('modulos').select('id,nombre').in('id', moduleIds) : Promise.resolve({ data: [], error: null }),
+    lessonIds.length ? supabase.from('lecciones').select('id,titulo').in('id', lessonIds) : Promise.resolve({ data: [], error: null }),
+    creatorIds.length ? supabase.from('usuarios').select('id,"Nombres",usuario').in('id', creatorIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  fail(coursesResult.error);
+  fail(modulesResult.error);
+  fail(lessonsResult.error);
+  fail(creatorsResult.error);
+
+  const courses = mapById(coursesResult.data);
+  const modules = mapById(modulesResult.data);
+  const lessons = mapById(lessonsResult.data);
+  const creators = mapById(creatorsResult.data);
+
+  const hydrated = evaluations.map((evaluation) => ({
+    ...evaluation,
+    titulo: evaluation.titulo || evaluation.nombre || '',
+    curso: courses.get(Number(evaluation.curso_id)) || null,
+    modulo: evaluation.modulo_id ? modules.get(Number(evaluation.modulo_id)) || null : null,
+    leccion: evaluation.leccion_id ? lessons.get(Number(evaluation.leccion_id)) || null : null,
+    creador: includeCreator && evaluation.creado_por ? creators.get(Number(evaluation.creado_por)) || null : evaluation.creador,
+  }));
+
+  return Array.isArray(items) ? hydrated : hydrated[0];
+};
+
 const getEvaluation = async (id) => {
-  const { data, error } = await supabase.from('evaluaciones').select('*, curso:cursos(id,nombre), modulo:modulos(id,nombre), leccion:lecciones(id,titulo), creador:usuarios(id,"Nombres",usuario)').eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('evaluaciones').select('*').eq('id', id).maybeSingle();
   fail(error);
   if (!data) throw new AppError('Evaluacion no encontrada', 404);
-  return data;
+  return hydrateEvaluationRelations(data, { includeCreator: true });
 };
 
 const getQuestions = async (evaluationId, includeAnswers = true) => {
@@ -41,13 +82,14 @@ const getQuestions = async (evaluationId, includeAnswers = true) => {
 
 const list = async (user, filters = {}) => {
   if (roleName(user) === 'Estudiante') return listStudent(user.id);
-  let query = supabase.from('evaluaciones').select('*, curso:cursos(id,nombre,creado_por), modulo:modulos(id,nombre), preguntas:evaluacion_preguntas(count), intentos:evaluacion_intentos(id,usuario_id,porcentaje,estado)').order('created_at', { ascending: false });
+  let query = supabase.from('evaluaciones').select('*, preguntas:evaluacion_preguntas(count), intentos:evaluacion_intentos(id,usuario_id,porcentaje,estado)').order('created_at', { ascending: false });
   if (filters.curso_id) query = query.eq('curso_id', filters.curso_id);
   if (filters.modulo_id) query = query.eq('modulo_id', filters.modulo_id);
   if (filters.estado) query = query.eq('estado', filters.estado);
   const { data, error } = await query;
   fail(error);
-  return data.filter((item) => roleName(user) === 'Administrador' || Number(item.curso.creado_por) === Number(user.id)).map((item) => {
+  const hydrated = await hydrateEvaluationRelations(data);
+  return hydrated.filter((item) => roleName(user) === 'Administrador' || Number(item.curso && item.curso.creado_por) === Number(user.id)).map((item) => {
     const submitted = (item.intentos || []).filter((attempt) => attempt.estado !== 'EnProgreso');
     const average = submitted.length ? Math.round(submitted.reduce((sum, attempt) => sum + Number(attempt.porcentaje || 0), 0) / submitted.length) : 0;
     return { ...item, cantidad_preguntas: item.preguntas && item.preguntas[0] ? item.preguntas[0].count : 0, estudiantes_respondieron: new Set(submitted.map((attempt) => attempt.usuario_id)).size, promedio: average };
@@ -57,12 +99,13 @@ const list = async (user, filters = {}) => {
 const listStudent = async (userId) => {
   const courseIds = await estudianteService.getAssignedCourseIds(userId);
   if (!courseIds.length) return [];
-  const { data, error } = await supabase.from('evaluaciones').select('*, curso:cursos(id,nombre), modulo:modulos(id,nombre), leccion:lecciones(id,titulo)').in('curso_id', courseIds).eq('estado', 'Publicada').order('fecha_limite', { ascending: true, nullsFirst: false });
+  const { data, error } = await supabase.from('evaluaciones').select('*').in('curso_id', courseIds).eq('estado', 'Publicada').order('fecha_limite', { ascending: true, nullsFirst: false });
   fail(error);
   if (!data.length) return [];
   const { data: attempts, error: attemptsError } = await supabase.from('evaluacion_intentos').select('*').eq('usuario_id', userId).in('evaluacion_id', data.map((item) => item.id)).order('numero_intento', { ascending: false });
   fail(attemptsError);
-  return data.map((evaluation) => {
+  const hydrated = await hydrateEvaluationRelations(data);
+  return hydrated.map((evaluation) => {
     const attempt = attempts.find((item) => Number(item.evaluacion_id) === Number(evaluation.id)) || null;
     const expired = evaluation.fecha_limite && new Date(evaluation.fecha_limite) < new Date();
     return { ...evaluation, ultimo_intento: attempt, estado_estudiante: expired && !attempt ? 'Vencida' : attempt ? attempt.estado : 'Pendiente' };
