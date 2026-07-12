@@ -8,6 +8,7 @@ const usuariosService = require('./usuarios.service');
 const AppError = require('../utils/AppError');
 
 const USER_SELECT = '*, rol:roles(id,nombre,descripcion)';
+const CAMPAIGN_COLUMN = 'Campa\u00f1a';
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
@@ -43,6 +44,56 @@ const magicLinkError = (error) => {
     return new AppError('La URL de retorno del enlace magico no esta permitida en Supabase.', 400, message);
   }
   return new AppError('No se pudo enviar el enlace magico', 500, message);
+};
+
+const resendError = (error, status = 500) => {
+  const message = typeof error === 'string'
+    ? error
+    : String(error && (error.message || error.name || error.error) ? (error.message || error.name || error.error) : '');
+  if (/domain|from/i.test(message)) {
+    return new AppError('Resend no pudo enviar el correo. Verifica el remitente RESEND_FROM_EMAIL y el dominio validado.', 400, message);
+  }
+  if (/api.?key|unauthorized|forbidden/i.test(message) || status === 401 || status === 403) {
+    return new AppError('Resend no esta autorizado. Revisa RESEND_API_KEY en Railway.', 401, message);
+  }
+  return new AppError('No se pudo enviar el enlace magico con Resend', status >= 400 ? status : 500, message);
+};
+
+const buildMagicEmailHtml = ({ name, link }) => `
+  <div style="font-family:Arial,sans-serif;background:#06111f;padding:32px;color:#eaf6ff">
+    <div style="max-width:560px;margin:auto;background:#0b1d33;border:1px solid #00c8ff55;border-radius:18px;padding:28px">
+      <p style="letter-spacing:2px;text-transform:uppercase;color:#00d9ff;font-size:12px;margin:0 0 12px">IA Learning Solutions</p>
+      <h1 style="font-size:26px;margin:0 0 12px;color:#fff">Tu acceso seguro esta listo</h1>
+      <p style="font-size:16px;line-height:1.5;color:#bfd0e2">Hola ${name || 'talento'}, usa este enlace para entrar al LMS y continuar tu curso gratuito.</p>
+      <p style="margin:28px 0">
+        <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#20e6c3,#1688ff);color:#00111f;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:12px">Entrar al LMS</a>
+      </p>
+      <p style="font-size:13px;line-height:1.5;color:#8fa4b8">Si no solicitaste este acceso, puedes ignorar este correo.</p>
+    </div>
+  </div>
+`;
+
+const sendMagicLinkWithResend = async ({ to, name, actionLink }) => {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  const from = process.env.RESEND_FROM_EMAIL || 'IA Learning Solutions <onboarding@resend.dev>';
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: 'Tu enlace de acceso a IA Learning Solutions',
+      html: buildMagicEmailHtml({ name, link: actionLink }),
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw resendError(payload, response.status);
+  return true;
 };
 
 const getUserByCredential = async (credential) => {
@@ -182,7 +233,7 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, cu
     Nombres: cleanName,
     Correo: cleanEmail,
     Cargo: 'Estudiante',
-    'Campaña': 'Cursos Gratis',
+    [CAMPAIGN_COLUMN]: 'Cursos Gratis',
     Supervisor: '',
     Estado: 'Activo',
     fecha_ingreso: new Date().toISOString().slice(0, 10),
@@ -208,24 +259,31 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, curso_id: curso
   await validateFreeCourse(cursoId);
   if (!isAllowedRedirectUrl(redirectTo)) throw new AppError('La URL de retorno no es valida', 400);
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email: cleanEmail,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: redirectTo,
-      data: {
-        nombres: cleanName || existing.Nombres || cleanEmail.split('@')[0],
-        usuario: String(usuario || existing?.usuario || '').trim(),
-        dni: String(dni || existing?.DNI || '').trim(),
-        curso_id: String(cursoId || ''),
-        origen: 'catalogo_publico',
+  const metadata = {
+    nombres: cleanName || existing.Nombres || cleanEmail.split('@')[0],
+    usuario: String(usuario || existing?.usuario || '').trim(),
+    dni: String(dni || existing?.DNI || '').trim(),
+    curso_id: String(cursoId || ''),
+    origen: 'catalogo_publico',
+  };
+
+  if (process.env.RESEND_API_KEY) {
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: cleanEmail,
+      options: {
+        redirectTo,
+        data: metadata,
       },
-    },
-  });
+    });
+    if (error) throw magicLinkError(error);
+    const actionLink = data && data.properties && data.properties.action_link;
+    if (!actionLink) throw new AppError('Supabase no genero el enlace magico', 500);
+    await sendMagicLinkWithResend({ to: cleanEmail, name: metadata.nombres, actionLink });
+    return { correo: cleanEmail, provider: 'resend' };
+  }
 
-  if (error) throw magicLinkError(error);
-
-  return { correo: cleanEmail };
+  throw new AppError('Configura RESEND_API_KEY en Railway para enviar enlaces magicos con Resend.', 500);
 };
 
 const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId }) => {
@@ -250,7 +308,7 @@ const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId 
       Nombres: String(metadata.nombres || metadata.name || email.split('@')[0]).trim(),
       Correo: email,
       Cargo: 'Estudiante',
-      'Campaña': 'Cursos Gratis',
+      [CAMPAIGN_COLUMN]: 'Cursos Gratis',
       Supervisor: '',
       Estado: 'Activo',
       fecha_ingreso: new Date().toISOString().slice(0, 10),
@@ -320,7 +378,7 @@ const loginWithGoogle = async ({ credential, curso_id: cursoId, rememberMe = tru
       Nombres: profile.name || email,
       Correo: email,
       Cargo: 'Estudiante',
-      'Campaña': 'Cursos Gratis',
+      [CAMPAIGN_COLUMN]: 'Cursos Gratis',
       Supervisor: '',
       Estado: 'Activo',
       fecha_ingreso: new Date().toISOString().slice(0, 10),

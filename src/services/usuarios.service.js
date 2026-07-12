@@ -5,6 +5,7 @@ const AppError = require('../utils/AppError');
 
 const TABLE = 'usuarios';
 const USUARIO_SELECT = '*, rol:roles(id,nombre,descripcion)';
+const CAMPAIGN_COLUMN = 'Campa\u00f1a';
 
 const normalizeSupabaseError = (error) => {
   if (!error) return null;
@@ -34,6 +35,13 @@ const sanitizeUsuario = (usuario) => {
 
 const prepareUsuarioPayload = async (usuario) => {
   const payload = { ...usuario };
+
+  Object.keys(payload).forEach((key) => {
+    if (key !== CAMPAIGN_COLUMN && /^Campa/i.test(key)) {
+      payload[CAMPAIGN_COLUMN] = payload[CAMPAIGN_COLUMN] || payload[key];
+      delete payload[key];
+    }
+  });
 
   if (payload.password) {
     payload.password_hash = await bcrypt.hash(payload.password, 10);
