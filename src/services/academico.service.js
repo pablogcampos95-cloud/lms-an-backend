@@ -246,8 +246,23 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
   const actividades = await evaluacionesService.courseActivities(Number(id), usuarioId, { publishedOnly: publicado });
 
   const lockedLessonIds = new Set();
-  if (publicado && usuarioId && actividades.length) {
-    let locked = false;
+  const lockedActivityKeys = new Set();
+  if (publicado && usuarioId) {
+    let activityGateLocked = false;
+    let sequentialLocked = false;
+    const markActivityLocked = (actividad) => lockedActivityKeys.add(`${actividad.tipo_actividad}:${actividad.id}`);
+    const isLessonComplete = (leccion) => Boolean(progresoMap.get(leccion.id) && progresoMap.get(leccion.id).completado);
+    const isActivityComplete = (actividad) => Boolean(actividad && actividad.completada);
+    const processLesson = (leccion) => {
+      if (activityGateLocked || sequentialLocked) lockedLessonIds.add(leccion.id);
+      if (!isLessonComplete(leccion)) sequentialLocked = true;
+    };
+    const processActivity = (actividad) => {
+      if (sequentialLocked) markActivityLocked(actividad);
+      if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) activityGateLocked = true;
+      if (!isActivityComplete(actividad)) sequentialLocked = true;
+    };
+
     modulos.forEach((modulo) => {
       const moduleItems = [
         ...lecciones.filter((leccion) => Number(leccion.modulo_id) === Number(modulo.id)).map((leccion) => ({ ...leccion, tipo_secuencia: 'Leccion' })),
@@ -255,21 +270,22 @@ const getCursoEstructura = async (id, { publicado = false, usuarioId = null } = 
       ].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
       moduleItems.forEach((item) => {
         if (item.tipo_secuencia === 'Leccion') {
-          if (locked) lockedLessonIds.add(item.id);
+          processLesson(item);
           actividades.filter((actividad) => actividad.orden == null && actividad.ubicacion === 'DespuesPaso' && Number(actividad.leccion_id) === Number(item.id)).forEach((actividad) => {
-            if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
+            processActivity(actividad);
           });
-        } else if (item.obligatoria && item.bloquea_avance && !item.completada) locked = true;
+        } else processActivity(item);
       });
       actividades.filter((actividad) => actividad.orden == null && actividad.ubicacion === 'FinModulo' && Number(actividad.modulo_id) === Number(modulo.id)).forEach((actividad) => {
-        if (actividad.obligatoria && actividad.bloquea_avance && !actividad.completada) locked = true;
+        processActivity(actividad);
       });
     });
+    actividades.filter((actividad) => actividad.ubicacion === 'FinCurso').forEach((actividad) => processActivity(actividad));
   }
 
   return {
     ...curso,
-    actividades,
+    actividades: actividades.map((actividad) => lockedActivityKeys.has(`${actividad.tipo_actividad}:${actividad.id}`) ? ({ ...actividad, bloqueado: true }) : ({ ...actividad, bloqueado: false })),
     modulos: modulos.map((modulo) => ({
       ...modulo,
       lecciones: lecciones
