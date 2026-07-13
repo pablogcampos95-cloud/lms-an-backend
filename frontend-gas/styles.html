@@ -1,6 +1,5 @@
 <style>
   :root {
-    --app-zoom: .75;
     --bg: #071426;
     --bg-deep: #040d1c;
     --panel: rgba(26, 37, 66, 0.9);
@@ -37,21 +36,6 @@
       var(--bg);
     color: var(--text);
     font-family: "Manrope", system-ui, sans-serif;
-  }
-
-  .app-shell,
-  .public-catalog-screen {
-    zoom: var(--app-zoom);
-  }
-
-  @supports not (zoom: 1) {
-    .app-shell,
-    .public-catalog-screen {
-      transform: scale(var(--app-zoom));
-      transform-origin: top left;
-      width: calc(100% / var(--app-zoom));
-      min-height: calc(100vh / var(--app-zoom));
-    }
   }
 
   h1, h2, h3, h4, h5, h6, .fw-bold { font-family: "Space Grotesk", "Manrope", sans-serif; }
