@@ -1,6 +1,5 @@
 <style>
   :root {
-    --platform-zoom: .8;
     --bg: #071426;
     --bg-deep: #040d1c;
     --panel: rgba(26, 37, 66, 0.9);
@@ -25,14 +24,13 @@
   html {
     scroll-behavior: smooth;
     text-size-adjust: 100%;
+    font-size: 80%;
   }
 
   body {
     margin: 0;
-    width: calc(100% / var(--platform-zoom));
-    min-height: calc(100vh / var(--platform-zoom));
+    min-height: 100vh;
     overflow-x: hidden;
-    zoom: var(--platform-zoom);
     background:
       radial-gradient(circle at 82% 8%, rgba(22, 119, 255, 0.16), transparent 28%),
       radial-gradient(circle at 16% 85%, rgba(33, 230, 182, 0.09), transparent 28%),
@@ -41,19 +39,12 @@
     font-family: "Manrope", system-ui, sans-serif;
   }
 
-  @supports not (zoom: 1) {
-    body {
-      transform: scale(var(--platform-zoom));
-      transform-origin: top left;
-    }
-  }
-
   h1, h2, h3, h4, h5, h6, .fw-bold { font-family: "Space Grotesk", "Manrope", sans-serif; }
   h1, h2, h3 { text-wrap: balance; }
   p { text-wrap: pretty; }
 
   .login-screen {
-    min-height: calc(100vh / var(--platform-zoom));
+    min-height: 100vh;
     display: grid;
     place-items: center;
     padding: 24px;
@@ -143,7 +134,7 @@
   .btn-outline-light:hover { background: rgba(37, 217, 232, 0.1); color: var(--cyan); border-color: var(--cyan); }
 
   .public-catalog-screen {
-    min-height: calc(100vh / var(--platform-zoom));
+    min-height: 100vh;
     background:
       radial-gradient(circle at 82% 8%, rgba(31,107,255,.22), transparent 28%),
       radial-gradient(circle at 12% 35%, rgba(0,216,255,.14), transparent 30%),
@@ -254,7 +245,7 @@
   .home-preview-list { display:grid;gap:8px;color:var(--muted); }
 
   .app-shell {
-    min-height: calc(100vh / var(--platform-zoom));
+    min-height: 100vh;
     display: flex;
   }
 
@@ -896,7 +887,7 @@
   .login-trust { display: flex; justify-content: center; gap: 18px; margin-top: 18px; color: var(--disabled); font-size: 0.72rem; }
   .login-trust i { color: var(--cyan); }
 
-  .sidebar { position: relative; display: flex; flex-direction: column; min-height: calc(100vh / var(--platform-zoom)); }
+  .sidebar { position: relative; display: flex; flex-direction: column; min-height: 100vh; }
   .side-nav { flex: 1; }
   .sidebar-learning-card { margin: 16px; padding: 18px; display: flex; flex-direction: column; gap: 7px; border: 1px solid rgba(0,216,255,0.2); border-radius: 18px; background: linear-gradient(145deg, rgba(0,216,255,0.1), rgba(31,107,255,0.06)); }
   .sidebar-learning-card small { color: var(--muted); }
@@ -1193,7 +1184,7 @@
   .public-catalog-screen,
   .app-shell {
     width: 100%;
-    min-height: calc(100vh / var(--platform-zoom));
+    min-height: 100vh;
     background:
       radial-gradient(circle at 100% 0%, rgba(35,242,163,.09), transparent 32%),
       radial-gradient(circle at 0% 100%, rgba(0,216,255,.08), transparent 30%),
