@@ -43,6 +43,87 @@ const prepareCoursePayload = (payload) => ({
   pasos_planificados: Math.max(0, Number(payload.pasos_planificados || 0)),
 });
 
+const emptyCourseStats = () => ({
+  durationMinutes: 0,
+  modules: 0,
+  steps: 0,
+});
+
+const getCourseStructureStats = async (courseIds = []) => {
+  const ids = [...new Set((courseIds || []).map((id) => Number(id)).filter(Boolean))];
+  const stats = new Map(ids.map((id) => [id, emptyCourseStats()]));
+  if (!ids.length) return stats;
+
+  const { data: modules, error: modulesError } = await supabase
+    .from('modulos')
+    .select('id,curso_id')
+    .in('curso_id', ids);
+  throwSupabaseError(modulesError);
+
+  (modules || []).forEach((module) => {
+    const item = stats.get(Number(module.curso_id));
+    if (item) item.modules += 1;
+  });
+
+  const moduleIds = (modules || []).map((module) => module.id);
+  if (moduleIds.length) {
+    const { data: lessons, error: lessonsError } = await supabase
+      .from('lecciones')
+      .select('modulo_id,tiempo_estimado_min')
+      .in('modulo_id', moduleIds);
+    throwSupabaseError(lessonsError);
+
+    const moduleToCourse = new Map((modules || []).map((module) => [Number(module.id), Number(module.curso_id)]));
+    (lessons || []).forEach((lesson) => {
+      const courseId = moduleToCourse.get(Number(lesson.modulo_id));
+      const item = stats.get(courseId);
+      if (!item) return;
+      item.steps += 1;
+      item.durationMinutes += Number(lesson.tiempo_estimado_min || 0);
+    });
+  }
+
+  const evaluations = await supabase
+    .from('evaluaciones')
+    .select('curso_id,tiempo_limite_min')
+    .in('curso_id', ids);
+  if (!evaluations.error) {
+    (evaluations.data || []).forEach((evaluation) => {
+      const item = stats.get(Number(evaluation.curso_id));
+      if (!item) return;
+      item.steps += 1;
+      item.durationMinutes += Number(evaluation.tiempo_limite_min || 0);
+    });
+  }
+
+  const forums = await supabase
+    .from('foros_evaluables')
+    .select('curso_id')
+    .in('curso_id', ids);
+  if (!forums.error) {
+    (forums.data || []).forEach((forum) => {
+      const item = stats.get(Number(forum.curso_id));
+      if (item) item.steps += 1;
+    });
+  }
+
+  return stats;
+};
+
+const applyComputedCourseStats = async (courses = []) => {
+  const stats = await getCourseStructureStats(courses.map((curso) => curso.id));
+  return courses.map((curso) => {
+    const item = stats.get(Number(curso.id)) || emptyCourseStats();
+    return {
+      ...curso,
+      duracion_estimada_min: item.durationMinutes || Number(curso.duracion_estimada_min || 0),
+      cantidad_modulos: item.modules || (curso.modulos && curso.modulos[0] ? curso.modulos[0].count : 0),
+      pasos_planificados: item.steps || Number(curso.pasos_planificados || 0),
+      modulos: undefined,
+    };
+  });
+};
+
 const assertEstado = (estado) => {
   if (estado && !ESTADOS.includes(estado)) throw new AppError('Estado academico invalido', 400);
 };
@@ -85,10 +166,7 @@ const listCursos = async ({ estado, categoria, search } = {}) => {
   if (search) query = query.ilike('nombre', `%${search}%`);
   const { data, error } = await query;
   throwSupabaseError(error);
-  return data.map((curso) => ({
-    ...curso,
-    cantidad_modulos: curso.modulos && curso.modulos[0] ? curso.modulos[0].count : 0,
-  }));
+  return applyComputedCourseStats(data);
 };
 
 const listPublicCourses = async ({ categoria, search } = {}) => {
@@ -113,17 +191,13 @@ const listPublicCourses = async ({ categoria, search } = {}) => {
     error = fallback.error;
   }
   throwSupabaseError(error);
-  return data.map((curso) => ({
-    ...curso,
-    cantidad_modulos: curso.modulos && curso.modulos[0] ? curso.modulos[0].count : 0,
-    modulos: undefined,
-  }));
+  return applyComputedCourseStats(data);
 };
 
 const listCursosByIds = async (ids) => {
   const { data, error } = await supabase.from('cursos').select('*, modulos(count)').in('id', ids).eq('estado', 'Publicado').order('created_at', { ascending: false });
   throwSupabaseError(error);
-  return data.map((curso) => ({ ...curso, cantidad_modulos: curso.modulos && curso.modulos[0] ? curso.modulos[0].count : 0 }));
+  return applyComputedCourseStats(data);
 };
 
 const getCurso = async (id) => {
