@@ -225,7 +225,7 @@ const create = async (user, payload) => {
   if (clean.ubicacion === 'FinModulo' && !clean.modulo_id) throw new AppError('Selecciona el modulo donde se ubicara la evaluacion', 400);
   if (clean.ubicacion === 'DespuesPaso' && !clean.leccion_id) throw new AppError('Selecciona el paso despues del cual aparecera la evaluacion', 400);
   if (clean.modulo_id && !clean.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
-  const data = await insertSingle('evaluaciones', { ...clean, creado_por: user.id });
+  const data = await insertSingle('evaluaciones', { ...clean, nombre: clean.titulo, creado_por: user.id });
   await replaceQuestions(data.id, payload.preguntas || []);
   return detail(user, data.id);
 };
@@ -241,7 +241,7 @@ const update = async (user, id, payload) => {
     if (count > 0) throw new AppError('No puedes modificar las preguntas porque la evaluacion ya tiene intentos registrados', 409);
   }
   if (clean.modulo_id && Number(clean.modulo_id) !== Number(current.modulo_id) && !payload.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
-  await updateRows('evaluaciones', { ...clean, updated_at: new Date().toISOString() }, (query) => query.eq('id', id));
+  await updateRows('evaluaciones', { ...clean, nombre: clean.titulo, updated_at: new Date().toISOString() }, (query) => query.eq('id', id));
   if (payload.preguntas) await replaceQuestions(id, payload.preguntas);
   return detail(user, id);
 };
