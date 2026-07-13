@@ -116,8 +116,17 @@ const syncCertificates = async (usuarioId, courses) => {
   const completed = courses.filter((course) => course.total_lecciones > 0 && course.avance === 100);
   for (const course of completed) {
     const codigo = buildCertificateCode(usuarioId, course.id);
-    const { error } = await supabase.from('certificados').upsert({ usuario_id: usuarioId, curso_id: course.id, codigo }, { onConflict: 'usuario_id,curso_id' });
-    if (error && !isCertificateSchemaError(error)) throwSupabaseError(error);
+    const existing = await supabase.from('certificados').select('id').eq('usuario_id', usuarioId).eq('curso_id', course.id).maybeSingle();
+    if (existing.error && !isCertificateSchemaError(existing.error)) throwSupabaseError(existing.error);
+    if (!existing.data) {
+      const { error } = await supabase.from('certificados').insert({ usuario_id: usuarioId, curso_id: course.id, codigo });
+      if (error && isCertificateSchemaError(error)) {
+        const fallback = await supabase.from('certificados').insert({ usuario_id: usuarioId, curso_id: course.id });
+        if (fallback.error) throwSupabaseError(fallback.error);
+      } else {
+        throwSupabaseError(error);
+      }
+    }
     await supabase.from('curso_asignaciones').update({ estado: 'Completado' }).eq('usuario_id', usuarioId).eq('curso_id', course.id);
   }
 };
@@ -178,7 +187,7 @@ const getCertificates = async (usuarioId) => {
   if (!error) return enrich(data || []);
   if (!isCertificateSchemaError(error)) throwSupabaseError(error);
 
-  const fallback = await supabase.from('certificados').select('id,curso_id,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId);
+  const fallback = await supabase.from('certificados').select('id,curso_id,fecha_emision,curso:cursos(id,nombre,categoria)').eq('usuario_id', usuarioId);
   if (fallback.error) {
     if (isCertificateSchemaError(fallback.error)) return [];
     throwSupabaseError(fallback.error);
@@ -186,7 +195,7 @@ const getCertificates = async (usuarioId) => {
   return enrich(fallback.data.map((certificate) => ({
     ...certificate,
     codigo: buildCertificateCode(usuarioId, certificate.curso_id || certificate.curso?.id),
-    emitido_at: null,
+    emitido_at: certificate.emitido_at || certificate.fecha_emision || null,
   })));
 };
 
