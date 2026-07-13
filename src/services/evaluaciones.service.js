@@ -8,6 +8,67 @@ const fail = (error, message = 'Error al consultar Supabase') => {
 };
 const missingEvaluationSchema = (error) => error && ['42P01', 'PGRST204', 'PGRST205'].includes(error.code);
 
+const missingColumn = (error) => {
+  const text = `${error && error.message ? error.message : ''} ${error && error.details ? error.details : ''}`;
+  const match = text.match(/column "([^"]+)" (?:of relation "[^"]+" )?does not exist/i)
+    || text.match(/'([^']+)' column of '[^']+' in the schema cache/i);
+  return match ? match[1] : null;
+};
+
+const withoutColumn = (payload, column) => {
+  if (Array.isArray(payload)) return payload.map((item) => withoutColumn(item, column));
+  const { [column]: removed, ...rest } = payload;
+  return rest;
+};
+
+const insertSingle = async (table, payload) => {
+  let current = payload;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { data, error } = await supabase.from(table).insert(current).select('*').single();
+    if (!error) return data;
+    const column = missingColumn(error);
+    if (!column || !(column in current)) fail(error);
+    current = withoutColumn(current, column);
+  }
+  throw new AppError('No se pudo guardar la evaluacion', 500);
+};
+
+const insertMany = async (table, rows) => {
+  if (!rows.length) return;
+  let current = rows;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase.from(table).insert(current);
+    if (!error) return;
+    const column = missingColumn(error);
+    if (!column || !(column in current[0])) fail(error);
+    current = withoutColumn(current, column);
+  }
+  throw new AppError('No se pudo guardar la evaluacion', 500);
+};
+
+const updateRows = async (table, payload, applyFilter) => {
+  let current = payload;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await applyFilter(supabase.from(table).update(current));
+    if (!error) return;
+    const column = missingColumn(error);
+    if (!column || !(column in current)) fail(error);
+    current = withoutColumn(current, column);
+  }
+  throw new AppError('No se pudo guardar la evaluacion', 500);
+};
+
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  const match = String(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (!match) return null;
+  const [, day, month, year, hour = '00', minute = '00'] = match;
+  const local = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  return Number.isNaN(local.getTime()) ? null : local.toISOString();
+};
+
 const roleName = (user) => user && user.rol && user.rol.nombre;
 const isManager = (user) => ['Administrador', 'Instructor'].includes(roleName(user));
 
@@ -135,7 +196,7 @@ const normalizeEvaluation = (payload) => ({
   curso_id: Number(payload.curso_id), modulo_id: payload.modulo_id ? Number(payload.modulo_id) : null, leccion_id: payload.leccion_id ? Number(payload.leccion_id) : null,
   orden: payload.orden ? Number(payload.orden) : null,
   titulo: String(payload.titulo || '').trim(), descripcion: payload.descripcion || null, ubicacion: payload.ubicacion || 'FinModulo', estado: payload.estado || 'Borrador',
-  fecha_inicio: payload.fecha_inicio || null, fecha_limite: payload.fecha_limite || null, tiempo_limite_min: payload.tiempo_limite_min ? Number(payload.tiempo_limite_min) : null,
+  fecha_inicio: normalizeDate(payload.fecha_inicio), fecha_limite: normalizeDate(payload.fecha_limite), tiempo_limite_min: payload.tiempo_limite_min ? Number(payload.tiempo_limite_min) : null,
   intentos_permitidos: Math.max(1, Number(payload.intentos_permitidos || 1)), puntaje_minimo: Number(payload.puntaje_minimo ?? 70),
   mostrar_resultado: payload.mostrar_resultado !== false, mostrar_correctas: Boolean(payload.mostrar_correctas), permitir_retroalimentacion: payload.permitir_retroalimentacion !== false,
   preguntas_aleatorias: Boolean(payload.preguntas_aleatorias), alternativas_aleatorias: Boolean(payload.alternativas_aleatorias), obligatoria: Boolean(payload.obligatoria), bloquea_avance: Boolean(payload.bloquea_avance),
@@ -147,12 +208,11 @@ const replaceQuestions = async (evaluationId, questions = []) => {
   for (let index = 0; index < questions.length; index += 1) {
     const question = questions[index];
     if (!question.enunciado || !question.tipo) throw new AppError('Cada pregunta requiere enunciado y tipo', 400);
-    const { data, error } = await supabase.from('evaluacion_preguntas').insert({ evaluacion_id: evaluationId, enunciado: question.enunciado, tipo: question.tipo, puntaje: Number(question.puntaje || 1), explicacion: question.explicacion || null, criterios_evaluacion: question.criterios_evaluacion || null, guia_instructor: question.guia_instructor || null, calificacion_parcial: Boolean(question.calificacion_parcial), orden: index + 1, activo: question.activo !== false }).select('*').single();
-    fail(error);
+    const data = await insertSingle('evaluacion_preguntas', { evaluacion_id: evaluationId, enunciado: question.enunciado, tipo: question.tipo, puntaje: Number(question.puntaje || 1), explicacion: question.explicacion || null, criterios_evaluacion: question.criterios_evaluacion || null, guia_instructor: question.guia_instructor || null, calificacion_parcial: Boolean(question.calificacion_parcial), orden: index + 1, activo: question.activo !== false });
     const options = question.opciones || [];
     if (['OpcionUnica', 'OpcionMultiple'].includes(question.tipo) && options.length < 2) throw new AppError('Las preguntas de opcion requieren al menos dos alternativas', 400);
     if (question.tipo === 'VerdaderoFalso' && !options.length) options.push({ texto: 'Verdadero', es_correcta: question.respuesta_correcta === true }, { texto: 'Falso', es_correcta: question.respuesta_correcta !== true });
-    if (options.length) fail((await supabase.from('evaluacion_opciones').insert(options.map((option, optionIndex) => ({ pregunta_id: data.id, texto: option.texto, es_correcta: Boolean(option.es_correcta), orden: optionIndex + 1 })))).error);
+    if (options.length) await insertMany('evaluacion_opciones', options.map((option, optionIndex) => ({ pregunta_id: data.id, texto: option.texto, es_correcta: Boolean(option.es_correcta), orden: optionIndex + 1 })));
   }
 };
 
@@ -165,8 +225,7 @@ const create = async (user, payload) => {
   if (clean.ubicacion === 'FinModulo' && !clean.modulo_id) throw new AppError('Selecciona el modulo donde se ubicara la evaluacion', 400);
   if (clean.ubicacion === 'DespuesPaso' && !clean.leccion_id) throw new AppError('Selecciona el paso despues del cual aparecera la evaluacion', 400);
   if (clean.modulo_id && !clean.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
-  const { data, error } = await supabase.from('evaluaciones').insert({ ...clean, creado_por: user.id }).select('*').single();
-  fail(error);
+  const data = await insertSingle('evaluaciones', { ...clean, creado_por: user.id });
   await replaceQuestions(data.id, payload.preguntas || []);
   return detail(user, data.id);
 };
@@ -182,8 +241,7 @@ const update = async (user, id, payload) => {
     if (count > 0) throw new AppError('No puedes modificar las preguntas porque la evaluacion ya tiene intentos registrados', 409);
   }
   if (clean.modulo_id && Number(clean.modulo_id) !== Number(current.modulo_id) && !payload.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
-  const { error } = await supabase.from('evaluaciones').update({ ...clean, updated_at: new Date().toISOString() }).eq('id', id);
-  fail(error);
+  await updateRows('evaluaciones', { ...clean, updated_at: new Date().toISOString() }, (query) => query.eq('id', id));
   if (payload.preguntas) await replaceQuestions(id, payload.preguntas);
   return detail(user, id);
 };
