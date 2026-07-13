@@ -1421,6 +1421,7 @@ async function openEvaluationModal(id = null, context = null) {
     courseSelect.value = context.courseId;
     await loadEvaluationLocations();
     document.getElementById('evaluationModule').value = context.moduleId;
+    await loadEvaluationLessons();
     document.getElementById('evaluationLesson').value = '';
     document.getElementById('evaluationLocation').value = 'FinModulo';
   }
@@ -2338,7 +2339,15 @@ function renderLessons(modulo) {
     </div>`).join('');
 }
 
-function openModuleEvaluationModal(moduleId) { openEvaluationModal(null, { courseId: AppState.cursoActual.id, moduleId }); }
+async function openModuleEvaluationModal(moduleId) {
+  try {
+    if (!AppState.cursoActual) throw new Error('Primero abre un curso.');
+    if (!AppState.cursos.length) await loadCourses();
+    await openEvaluationModal(null, { courseId: AppState.cursoActual.id, moduleId });
+  } catch (error) {
+    Swal.fire('No se pudo abrir la evaluacion', error.message, 'error');
+  }
+}
 function openModuleForumModal(moduleId) { openForumModal(null, { courseId: AppState.cursoActual.id, moduleId }); }
 async function moveEvaluation(id, direction) { try { await EvaluacionesService.ordenar(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
 async function moveForum(id, direction) { try { await EvaluacionesService.ordenarForo(id, direction); await openCourseEditor(AppState.cursoActual.id); } catch (error) { Swal.fire('No se pudo ordenar', error.message, 'error'); } }
