@@ -167,20 +167,10 @@ const getCertificates = async (usuarioId) => {
   const { data: user } = await supabase.from('usuarios').select('id,"Nombres",usuario').eq('id', usuarioId).maybeSingle();
   const enrich = async (certificates) => {
     if (!certificates.length) return [];
-    const courseIds = certificates.map((certificate) => certificate.curso?.id || certificate.curso_id).filter(Boolean);
-    const { data: templates } = await supabase
-      .from('certificado_plantillas')
-      .select('*')
-      .eq('activo', true)
-      .or(courseIds.length ? `curso_id.is.null,curso_id.in.(${courseIds.join(',')})` : 'curso_id.is.null')
-      .order('curso_id', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
     return certificates.map((certificate) => {
-      const courseId = certificate.curso?.id || certificate.curso_id;
-      const template = (templates || []).find((item) => Number(item.curso_id) === Number(courseId)) || (templates || []).find((item) => item.curso_id === null) || DEFAULT_CERTIFICATE_TEMPLATE;
       return {
         ...certificate,
-        plantilla: applyCertificateTemplate(template, certificate, user),
+        plantilla: applyCertificateTemplate(DEFAULT_CERTIFICATE_TEMPLATE, certificate, user),
       };
     });
   };

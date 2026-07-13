@@ -32,4 +32,22 @@ where not exists (
   where nombre = 'Diploma IA Learning Solutions'
 );
 
+update public.certificado_plantillas
+set
+  descripcion = 'Plantilla unica para certificados de finalizacion. Solo cambia curso, participante y fecha.',
+  curso_id = null,
+  titulo = 'Certificado de finalizacion',
+  subtitulo = '{{curso}}',
+  cuerpo = 'Certificado emitido para {{nombre}} el {{fecha}}.',
+  firma_nombre = 'Pablo Gutierrez',
+  firma_cargo = 'Director General',
+  color_principal = '#00d8ff',
+  fondo_url = '/assets/certificates/ials-diploma-template.png',
+  activo = true
+where nombre = 'Diploma IA Learning Solutions';
+
+update public.certificado_plantillas
+set activo = false
+where nombre <> 'Diploma IA Learning Solutions';
+
 notify pgrst, 'reload schema';
