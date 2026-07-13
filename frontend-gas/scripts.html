@@ -1590,7 +1590,7 @@ function openStudentCertificate(id) {
   if (!certificate) return;
   AppState.currentCertificate = certificate;
   const template = certificate.plantilla || {};
-  const background = template.fondo_url || '/assets/certificates/ials-diploma-template.png';
+  const background = template.fondo_url || '/assets/certificates/ials-finalizacion-2026.png';
   document.getElementById('certificateViewBody').innerHTML = `
     <div class="issued-certificate" style="--certificate-bg:url('${cssUrl(background)}'); --certificate-accent:${escapeHtml(template.color_principal || '#00d8ff')}">
       <div class="issued-certificate-course">${escapeHtml(template.curso_finalizado || template.subtitulo_render || certificate.curso.nombre)}</div>
@@ -1695,7 +1695,7 @@ async function openCertificateTemplateModal(id = null) {
   document.getElementById('certificateTemplateSigner').value = template ? template.firma_nombre || '' : 'Pablo Gutierrez Campos';
   document.getElementById('certificateTemplateSignerRole').value = template ? template.firma_cargo || '' : 'Director General';
   document.getElementById('certificateTemplateColor').value = template ? template.color_principal || '#00d8ff' : '#00d8ff';
-  document.getElementById('certificateTemplateBackground').value = template ? template.fondo_url || '' : '/assets/certificates/ials-diploma-template.png';
+  document.getElementById('certificateTemplateBackground').value = template ? template.fondo_url || '' : '/assets/certificates/ials-finalizacion-2026.png';
   document.getElementById('certificateTemplateBackgroundFile').value = '';
   document.getElementById('certificateTemplateActive').checked = template ? template.activo !== false : true;
   populateCertificateCourseOptions(template ? template.curso_id : '');

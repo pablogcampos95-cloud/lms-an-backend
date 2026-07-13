@@ -14,7 +14,7 @@ const DEFAULT_CERTIFICATE_TEMPLATE = {
   firma_nombre: 'Pablo Gutierrez Campos',
   firma_cargo: 'Director General',
   color_principal: '#00d8ff',
-  fondo_url: '/assets/certificates/ials-diploma-template.png',
+  fondo_url: '/assets/certificates/ials-finalizacion-2026.png',
   activo: true,
   creado_por: null,
 };

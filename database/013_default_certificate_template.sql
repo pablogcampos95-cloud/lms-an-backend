@@ -24,7 +24,7 @@ select
   'Pablo Gutierrez Campos',
   'Director General',
   '#00d8ff',
-  '/assets/certificates/ials-diploma-template.png',
+  '/assets/certificates/ials-finalizacion-2026.png',
   true
 where not exists (
   select 1
@@ -42,7 +42,7 @@ set
   firma_nombre = 'Pablo Gutierrez',
   firma_cargo = 'Director General',
   color_principal = '#00d8ff',
-  fondo_url = '/assets/certificates/ials-diploma-template.png',
+  fondo_url = '/assets/certificates/ials-finalizacion-2026.png',
   activo = true
 where nombre = 'Diploma IA Learning Solutions';
 
