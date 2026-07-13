@@ -13,6 +13,7 @@ router.post('/magic-link', asyncHandler(authController.requestMagicLink));
 router.post('/magic-session', asyncHandler(authController.completeMagicLink));
 router.get('/google/config', asyncHandler(authController.googleConfig));
 router.post('/google', asyncHandler(authController.google));
+router.put('/change-password', requireAuth, asyncHandler(authController.changePassword));
 router.get('/me', requireAuth, asyncHandler(authController.me));
 
 module.exports = router;

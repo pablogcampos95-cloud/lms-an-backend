@@ -65,6 +65,16 @@ const me = async (req, res) => {
   });
 };
 
+const changePassword = async (req, res) => {
+  const usuario = await authService.changePassword(req.user.id, req.body);
+
+  res.json({
+    ok: true,
+    usuario,
+    message: 'Contrasena actualizada correctamente',
+  });
+};
+
 module.exports = {
   login,
   registerPublic,
@@ -72,5 +82,6 @@ module.exports = {
   completeMagicLink,
   googleConfig,
   google,
+  changePassword,
   me,
 };

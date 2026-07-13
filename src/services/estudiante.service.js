@@ -102,12 +102,13 @@ const getAssignedCoursesProgress = async (usuarioId) => {
     const courseLessons = lessons.filter((lesson) => moduleCourse.get(lesson.modulo_id) === assignment.curso.id);
     const completedLessons = courseLessons.filter((lesson) => completedIds.has(lesson.id)).length;
     const completedMinutes = courseLessons.filter((lesson) => completedIds.has(lesson.id)).reduce((sum, lesson) => sum + Number(lesson.tiempo_estimado_min || 0), 0);
+    const courseMinutes = courseLessons.reduce((sum, lesson) => sum + Number(lesson.tiempo_estimado_min || 0), 0);
     const activities = await evaluacionesService.courseActivities(assignment.curso.id, usuarioId);
     const completedActivities = activities.filter((activity) => activity.completada).length;
     const total = courseLessons.length + activities.length;
     const completed = completedLessons + completedActivities;
     const avance = total ? Math.round((completed / total) * 100) : 0;
-    return { ...assignment.curso, asignacion_id: assignment.id, assigned_at: assignment.assigned_at, cantidad_modulos: modules.filter((item) => Number(item.curso_id) === Number(assignment.curso.id)).length, total_lecciones: total, lecciones_completadas: completed, total_actividades: activities.length, actividades_completadas: completedActivities, minutos_completados: completedMinutes, avance };
+    return { ...assignment.curso, duracion_estimada_min: courseMinutes || Number(assignment.curso.duracion_estimada_min || 0), asignacion_id: assignment.id, assigned_at: assignment.assigned_at, cantidad_modulos: modules.filter((item) => Number(item.curso_id) === Number(assignment.curso.id)).length, total_lecciones: total, lecciones_completadas: completed, total_actividades: activities.length, actividades_completadas: completedActivities, minutos_completados: completedMinutes, avance };
   }));
 };
 

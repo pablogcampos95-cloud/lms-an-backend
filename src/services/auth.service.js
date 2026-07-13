@@ -9,6 +9,8 @@ const AppError = require('../utils/AppError');
 
 const USER_SELECT = '*, rol:roles(id,nombre,descripcion)';
 const CAMPAIGN_COLUMN = 'Campa\u00f1a';
+const PUBLIC_USERNAME_DOMAIN = process.env.PUBLIC_USERNAME_DOMAIN || 'ialearningsolutions.net';
+const PUBLIC_TEMPORARY_PASSWORD = process.env.PUBLIC_TEMPORARY_PASSWORD || '123456';
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
@@ -59,12 +61,20 @@ const resendError = (error, status = 500) => {
   return new AppError('No se pudo enviar el enlace magico con Resend', status >= 400 ? status : 500, message);
 };
 
-const buildMagicEmailHtml = ({ name, link }) => `
+const buildMagicEmailHtml = ({ name, link, username, temporaryPassword }) => `
   <div style="font-family:Arial,sans-serif;background:#06111f;padding:32px;color:#eaf6ff">
     <div style="max-width:560px;margin:auto;background:#0b1d33;border:1px solid #00c8ff55;border-radius:18px;padding:28px">
       <p style="letter-spacing:2px;text-transform:uppercase;color:#00d9ff;font-size:12px;margin:0 0 12px">IA Learning Solutions</p>
       <h1 style="font-size:26px;margin:0 0 12px;color:#fff">Tu acceso seguro esta listo</h1>
-      <p style="font-size:16px;line-height:1.5;color:#bfd0e2">Hola ${name || 'talento'}, usa este enlace para entrar al LMS y continuar tu curso gratuito.</p>
+      <p style="font-size:16px;line-height:1.5;color:#bfd0e2">Hola ${name || 'talento'}, ya creamos tu acceso al LMS para continuar tu curso gratuito.</p>
+      ${username && temporaryPassword ? `
+        <div style="background:#06111f;border:1px solid #00d9ff55;border-radius:14px;padding:16px;margin:20px 0;color:#dff7ff">
+          <p style="margin:0 0 8px;font-size:13px;color:#8fa4b8">Tambien puedes ingresar manualmente con:</p>
+          <p style="margin:0 0 6px"><strong>Usuario:</strong> ${username}</p>
+          <p style="margin:0"><strong>Clave temporal:</strong> ${temporaryPassword}</p>
+          <p style="margin:12px 0 0;font-size:13px;color:#8fa4b8">En tu primer ingreso te pediremos cambiar esta clave.</p>
+        </div>
+      ` : ''}
       <p style="margin:28px 0">
         <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#20e6c3,#1688ff);color:#00111f;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:12px">Entrar al LMS</a>
       </p>
@@ -73,7 +83,7 @@ const buildMagicEmailHtml = ({ name, link }) => `
   </div>
 `;
 
-const sendMagicLinkWithResend = async ({ to, name, actionLink }) => {
+const sendMagicLinkWithResend = async ({ to, name, actionLink, username, temporaryPassword }) => {
   if (!process.env.RESEND_API_KEY) return false;
 
   const from = process.env.RESEND_FROM_EMAIL || 'IA Learning Solutions <onboarding@resend.dev>';
@@ -87,7 +97,7 @@ const sendMagicLinkWithResend = async ({ to, name, actionLink }) => {
       from,
       to: [to],
       subject: 'Tu enlace de acceso a IA Learning Solutions',
-      html: buildMagicEmailHtml({ name, link: actionLink }),
+      html: buildMagicEmailHtml({ name, link: actionLink, username, temporaryPassword }),
     }),
   });
 
@@ -174,6 +184,29 @@ const uniqueUsername = async (baseValue) => {
   return `${base.slice(0, 32)}_${crypto.randomBytes(3).toString('hex')}`;
 };
 
+const normalizePublicUsernameLocalPart = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .toLowerCase();
+
+const uniquePublicUsername = async (nameOrEmail) => {
+  const source = String(nameOrEmail || '').includes('@')
+    ? String(nameOrEmail).split('@')[0]
+    : nameOrEmail;
+  const base = normalizePublicUsernameLocalPart(source) || `estudiante${Date.now()}`;
+
+  for (let index = 0; index < 20; index += 1) {
+    const suffix = index === 0 ? '' : String(index + 1);
+    const candidate = `${base}${suffix}@${PUBLIC_USERNAME_DOMAIN}`;
+    const { data, error } = await supabase.from('usuarios').select('id').ilike('usuario', candidate).maybeSingle();
+    if (error) throw new AppError('Error al validar usuario', 500, error.message);
+    if (!data) return candidate;
+  }
+
+  return `${base}${crypto.randomBytes(3).toString('hex')}@${PUBLIC_USERNAME_DOMAIN}`;
+};
+
 const validateFreeCourse = async (cursoId) => {
   const id = Number(cursoId);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -216,16 +249,26 @@ const isMissingOptionalColumn = (error, columnName) => {
   return new RegExp(`${columnName}|schema cache|could not find|column .*does not exist`, 'i').test(detail);
 };
 
-const createUsuarioAllowingMissingPhone = async (payload) => {
-  try {
-    return await usuariosService.createUsuario(payload);
-  } catch (error) {
-    if (payload.Celular && isMissingOptionalColumn(error, 'Celular')) {
-      const { Celular, ...fallbackPayload } = payload;
-      return usuariosService.createUsuario(fallbackPayload);
+const createUsuarioAllowingMissingOptionalColumns = async (payload) => {
+  const fallbackPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await usuariosService.createUsuario(fallbackPayload);
+    } catch (error) {
+      if (Object.prototype.hasOwnProperty.call(fallbackPayload, 'Celular') && isMissingOptionalColumn(error, 'Celular')) {
+        delete fallbackPayload.Celular;
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(fallbackPayload, 'requiere_cambio_password') && isMissingOptionalColumn(error, 'requiere_cambio_password')) {
+        delete fallbackPayload.requiere_cambio_password;
+        continue;
+      }
+      throw error;
     }
-    throw error;
   }
+
+  return usuariosService.createUsuario(fallbackPayload);
 };
 
 const createPublicStudent = async ({ nombres, correo, usuario, password, dni, celular, curso_id: cursoId }) => {
@@ -244,10 +287,10 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, ce
   await validateFreeCourse(cursoId);
 
   const rolId = await getStudentRoleId();
-  const username = await uniqueUsername(usuario || cleanEmail.split('@')[0]);
+  const username = await uniquePublicUsername(usuario || cleanName || cleanEmail);
   const documentValue = String(dni || '').trim() || Date.now().toString().slice(-9);
 
-  const created = await createUsuarioAllowingMissingPhone({
+  const created = await createUsuarioAllowingMissingOptionalColumns({
     DNI: documentValue,
     Nombres: cleanName,
     Correo: cleanEmail,
@@ -259,6 +302,7 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, ce
     fecha_ingreso: new Date().toISOString().slice(0, 10),
     usuario: username,
     password: cleanPassword,
+    requiere_cambio_password: cleanPassword === PUBLIC_TEMPORARY_PASSWORD,
     rol_id: rolId,
     tipo_plan: 'Gratuito',
   });
@@ -273,7 +317,7 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, celular, curso_
   const cleanEmail = String(correo || '').trim().toLowerCase();
   const cleanName = String(nombres || '').trim();
   const cleanPhone = String(celular || '').trim();
-  const existing = cleanEmail ? await getUserByCredential(cleanEmail) : null;
+  let existing = cleanEmail ? await getUserByCredential(cleanEmail) : null;
 
   if (!isValidEmail(cleanEmail)) throw new AppError('Ingresa un correo valido', 400);
   if (!existing && !cleanName) throw new AppError('El nombre es obligatorio para crear la cuenta gratuita', 400);
@@ -281,9 +325,37 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, celular, curso_
   await validateFreeCourse(cursoId);
   if (!isAllowedRedirectUrl(redirectTo)) throw new AppError('La URL de retorno no es valida', 400);
 
+  let generatedUsername = existing ? existing.usuario : '';
+  let includeTemporaryCredentials = false;
+
+  if (!existing) {
+    const rolId = await getStudentRoleId();
+    generatedUsername = await uniquePublicUsername(usuario || cleanName || cleanEmail);
+    const created = await createUsuarioAllowingMissingOptionalColumns({
+      DNI: String(dni || '').trim() || Date.now().toString().slice(-9),
+      Nombres: cleanName,
+      Correo: cleanEmail,
+      Celular: cleanPhone || null,
+      Cargo: 'Estudiante',
+      [CAMPAIGN_COLUMN]: 'Cursos Gratis',
+      Supervisor: '',
+      Estado: 'Activo',
+      fecha_ingreso: new Date().toISOString().slice(0, 10),
+      usuario: generatedUsername,
+      password: PUBLIC_TEMPORARY_PASSWORD,
+      requiere_cambio_password: true,
+      rol_id: rolId,
+      tipo_plan: 'Gratuito',
+    });
+    existing = await getUserByCredential(created.usuario || generatedUsername);
+    includeTemporaryCredentials = true;
+  }
+
+  if (existing && cursoId) await ensureCourseAssignment(existing.id, cursoId);
+
   const metadata = {
     nombres: cleanName || existing.Nombres || cleanEmail.split('@')[0],
-    usuario: String(usuario || existing?.usuario || '').trim(),
+    usuario: String(generatedUsername || existing?.usuario || '').trim(),
     dni: String(dni || existing?.DNI || '').trim(),
     celular: cleanPhone || existing?.Celular || '',
     curso_id: String(cursoId || ''),
@@ -302,7 +374,13 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, celular, curso_
     if (error) throw magicLinkError(error);
     const actionLink = data && data.properties && data.properties.action_link;
     if (!actionLink) throw new AppError('Supabase no genero el enlace magico', 500);
-    await sendMagicLinkWithResend({ to: cleanEmail, name: metadata.nombres, actionLink });
+    await sendMagicLinkWithResend({
+      to: cleanEmail,
+      name: metadata.nombres,
+      actionLink,
+      username: includeTemporaryCredentials ? generatedUsername : null,
+      temporaryPassword: includeTemporaryCredentials ? PUBLIC_TEMPORARY_PASSWORD : null,
+    });
     return { correo: cleanEmail, provider: 'resend' };
   }
 
@@ -325,8 +403,10 @@ const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId 
 
   if (!user) {
     const rolId = await getStudentRoleId();
-    const username = await uniqueUsername(metadata.usuario || email.split('@')[0]);
-    const created = await createUsuarioAllowingMissingPhone({
+    const username = metadata.usuario
+      ? await uniquePublicUsername(metadata.usuario)
+      : await uniquePublicUsername(metadata.nombres || email);
+    const created = await createUsuarioAllowingMissingOptionalColumns({
       DNI: String(metadata.dni || '').trim() || Date.now().toString().slice(-9),
       Nombres: String(metadata.nombres || metadata.name || email.split('@')[0]).trim(),
       Correo: email,
@@ -337,7 +417,8 @@ const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId 
       Estado: 'Activo',
       fecha_ingreso: new Date().toISOString().slice(0, 10),
       usuario: username,
-      password: crypto.randomBytes(16).toString('hex'),
+      password: PUBLIC_TEMPORARY_PASSWORD,
+      requiere_cambio_password: true,
       rol_id: rolId,
       tipo_plan: 'Gratuito',
     });
@@ -364,6 +445,25 @@ const login = async ({ usuario, password, rememberMe = false }) => {
   }
 
   return signSession(data, rememberMe);
+};
+
+const changePassword = async (usuarioId, { currentPassword, newPassword }) => {
+  const user = await usuariosService.getUsuarioWithPasswordById(usuarioId);
+  const current = String(currentPassword || '').trim();
+  const next = String(newPassword || '').trim();
+
+  if (!current) throw new AppError('Ingresa tu clave actual', 400);
+  if (next.length < 6) throw new AppError('La nueva contrasena debe tener al menos 6 caracteres', 400);
+
+  const isCurrentValid = await bcrypt.compare(current, user.password_hash || '');
+  if (!isCurrentValid) throw new AppError('La clave actual no es correcta', 401);
+
+  const updated = await usuariosService.updateUsuario(usuarioId, {
+    password: next,
+    requiere_cambio_password: false,
+  });
+
+  return updated;
 };
 
 const googleConfig = () => ({
@@ -429,5 +529,6 @@ module.exports = {
   completeMagicLink,
   googleConfig,
   loginWithGoogle,
+  changePassword,
   getMe,
 };

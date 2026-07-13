@@ -14,6 +14,7 @@ const AppState = {
   courseAssignmentModal: null,
   certificateTemplateModal: null,
   certificateViewModal: null,
+  passwordChangeModal: null,
   certificateTemplates: [],
   studentCertificates: [],
   studentLessons: [],
@@ -126,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AppState.courseAssignmentModal = new bootstrap.Modal(document.getElementById('courseAssignmentModal'));
   AppState.certificateTemplateModal = new bootstrap.Modal(document.getElementById('certificateTemplateModal'));
   AppState.certificateViewModal = new bootstrap.Modal(document.getElementById('certificateViewModal'));
+  AppState.passwordChangeModal = new bootstrap.Modal(document.getElementById('passwordChangeModal'));
   AppState.evaluationModal = new bootstrap.Modal(document.getElementById('evaluationModal'));
   AppState.takeEvaluationModal = new bootstrap.Modal(document.getElementById('takeEvaluationModal'));
   AppState.forumModal = new bootstrap.Modal(document.getElementById('forumModal'));
@@ -143,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
+  document.getElementById('passwordChangeForm').addEventListener('submit', handlePasswordChange);
   document.getElementById('openPublicLogin').addEventListener('click', showLogin);
   document.getElementById('openFreeCourses').addEventListener('click', scrollToFreeCourses);
   document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
@@ -282,10 +285,49 @@ async function startSession(usuario) {
   renderCurrentPlan();
   showView('dashboard');
   await Promise.allSettled(isStudent() ? [loadDashboard(), loadCourses()] : [loadDashboard(), loadRoles(), loadUsers(), loadCourses()]);
+  enforcePasswordChangeIfNeeded();
 }
 
 function isStudent() {
   return Boolean(AppState.usuario && AppState.usuario.rol && AppState.usuario.rol.nombre === 'Estudiante');
+}
+
+function requiresPasswordChange(usuario = AppState.usuario) {
+  return usuario && (usuario.requiere_cambio_password === true || usuario.requiere_cambio_password === 'true');
+}
+
+function enforcePasswordChangeIfNeeded() {
+  if (!requiresPasswordChange()) return;
+  document.getElementById('passwordChangeForm').reset();
+  AppState.passwordChangeModal.show();
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const current = document.getElementById('passwordChangeCurrent').value;
+  const next = document.getElementById('passwordChangeNew').value;
+  const confirm = document.getElementById('passwordChangeConfirm').value;
+  const button = document.getElementById('passwordChangeButton');
+  const original = button.innerHTML;
+
+  if (next !== confirm) {
+    Swal.fire('Contrasenas distintas', 'La nueva contrasena y la confirmacion deben coincidir.', 'warning');
+    return;
+  }
+
+  try {
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+    const updated = await AuthService.changePassword(current, next);
+    AppState.usuario = updated;
+    AppState.passwordChangeModal.hide();
+    toastSuccess('Contrasena actualizada');
+  } catch (error) {
+    Swal.fire('No se pudo cambiar la contrasena', error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = original;
+  }
 }
 
 function configureRoleInterface() {
@@ -1222,7 +1264,7 @@ function buildStudentJourney(course) {
   const journey = [];
   let locked = false;
   const appendActivity = (activity, moduleName) => {
-    journey.push({ ...activity, es_actividad: true, modulo_nombre: moduleName || 'Actividad del curso', bloqueado: locked });
+    journey.push({ ...activity, es_actividad: true, modulo_nombre: moduleName || 'Actividad del curso', bloqueo_base: locked, bloqueado: locked });
     if (activity.obligatoria && activity.bloquea_avance && !activity.completada) locked = true;
   };
   (course.modulos || []).forEach((module) => {
@@ -1233,14 +1275,29 @@ function buildStudentJourney(course) {
     items.forEach((item) => {
       if (item.sequenceType === 'activity') appendActivity(item, module.nombre);
       else {
-        journey.push({ ...item, modulo_nombre: module.nombre, bloqueado: locked });
+        journey.push({ ...item, modulo_nombre: module.nombre, bloqueo_base: locked || item.bloqueado === true, bloqueado: locked || item.bloqueado === true });
         activities.filter((activity) => activity.orden == null && activity.ubicacion === 'DespuesPaso' && Number(activity.leccion_id) === Number(item.id)).forEach((activity) => appendActivity(activity, module.nombre));
       }
     });
     activities.filter((activity) => activity.orden == null && activity.ubicacion === 'FinModulo' && Number(activity.modulo_id) === Number(module.id)).forEach((activity) => appendActivity(activity, module.nombre));
   });
   activities.filter((activity) => activity.ubicacion === 'FinCurso').forEach((activity) => appendActivity(activity, 'Cierre del curso'));
-  return journey;
+  return applySequentialLocks(journey);
+}
+
+function isJourneyItemComplete(item) {
+  return Boolean(item && (item.completada || (item.progreso && item.progreso.completado)));
+}
+
+function applySequentialLocks(journey) {
+  let previousPending = false;
+  return (journey || []).map((item, index) => {
+    const baseLocked = item.bloqueo_base === true;
+    const bloqueado = baseLocked || (index > 0 && previousPending);
+    const copy = { ...item, bloqueado };
+    if (!isJourneyItemComplete(copy)) previousPending = true;
+    return copy;
+  });
 }
 
 async function loadStudentCourses() {
@@ -2047,6 +2104,26 @@ function formatDurationHours(minutes = 0) {
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hora${hours === 1 ? '' : 's'}`;
 }
 
+function getCourseStructureTotals(course = {}) {
+  const modulos = course.modulos || [];
+  const activities = course.actividades || [];
+  const moduleIds = new Set(modulos.map((modulo) => Number(modulo.id)));
+  const lessonMinutes = modulos.reduce((sum, modulo) => sum + (modulo.lecciones || []).reduce((inner, leccion) => inner + Number(leccion.tiempo_estimado_min || 0), 0), 0);
+  const activityMinutes = activities.reduce((sum, activity) => {
+    if (activity.tipo_actividad === 'Evaluacion') return sum + Number(activity.tiempo_limite_min || 0);
+    return sum + Number(activity.tiempo_estimado_min || 0);
+  }, 0);
+  const lessons = modulos.reduce((sum, modulo) => sum + (modulo.lecciones || []).length, 0);
+  const courseActivities = activities.filter((activity) => !activity.modulo_id || moduleIds.has(Number(activity.modulo_id)));
+  return {
+    durationMinutes: lessonMinutes + activityMinutes,
+    modules: modulos.length,
+    steps: lessons + courseActivities.length,
+    lessons,
+    activities: courseActivities.length,
+  };
+}
+
 function openCreateCourseModal() {
   document.getElementById('courseModalTitle').textContent = 'Crear curso';
   document.getElementById('courseForm').reset();
@@ -2187,6 +2264,7 @@ async function openCourseEditor(id) {
   }
   try {
     AppState.cursoActual = await CursosService.obtener(id);
+    const totals = getCourseStructureTotals(AppState.cursoActual);
     document.getElementById('coursesListPanel').classList.add('d-none');
     document.getElementById('courseEditorPanel').classList.remove('d-none');
     document.getElementById('editorCourseName').textContent = AppState.cursoActual.nombre;
@@ -2198,7 +2276,7 @@ async function openCourseEditor(id) {
     document.getElementById('courseInfoSummary').innerHTML = `
       <div class="row g-4 align-items-center">
         ${AppState.cursoActual.imagen_portada_url ? `<div class="col-md-3"><img class="course-cover" src="${escapeHtml(AppState.cursoActual.imagen_portada_url)}" alt="Portada"></div>` : ''}
-        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge ${AppState.cursoActual.es_gratis === true ? 'text-bg-info' : 'badge-soft'}">${AppState.cursoActual.es_gratis === true ? 'Gratis' : 'No gratis'}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${formatDurationHours(AppState.cursoActual.duracion_estimada_min)} · Modulos estimados: ${Number(AppState.cursoActual.modulos_planificados || AppState.cursoActual.cantidad_modulos || 0)} · Pasos estimados: ${Number(AppState.cursoActual.pasos_planificados || 0)}</small></div>
+        <div class="col"><div class="d-flex gap-2 mb-2"><span class="badge ${courseStatusClass(AppState.cursoActual.estado)}">${escapeHtml(AppState.cursoActual.estado)}</span><span class="badge ${AppState.cursoActual.es_gratis === true ? 'text-bg-info' : 'badge-soft'}">${AppState.cursoActual.es_gratis === true ? 'Gratis' : 'No gratis'}</span></div><p>${escapeHtml(AppState.cursoActual.descripcion_completa || AppState.cursoActual.descripcion_corta || 'Sin descripcion')}</p><small class="text-secondary">Duracion estimada: ${formatDurationHours(totals.durationMinutes)} · Modulos creados: ${totals.modules} · Pasos creados: ${totals.steps}</small></div>
       </div>`;
     renderModulesEditor();
   } catch (error) { Swal.fire('No se pudo cargar el curso', error.message, 'error'); }
@@ -2584,6 +2662,7 @@ async function submitIntegratedEvaluationAttempt(event, id) {
     if (lesson && Number(lesson.id) === Number(id)) {
       lesson.intento = result;
       lesson.completada = ['Aprobado','Enviado','PendienteCalificacion'].includes(result.estado);
+      AppState.studentLessons = applySequentialLocks(AppState.studentLessons);
     }
     await loadIntegratedEvaluation(id);
     Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info');
@@ -2615,8 +2694,8 @@ function renderStudentJourneyOutline() {
   }).join('');
 }
 
-function selectStudentLesson(index) { if (AppState.studentLessons[index].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
+function selectStudentLesson(index) { if (AppState.studentLessons[index].bloqueado) { Swal.fire('Contenido bloqueado', 'Completa primero el paso anterior para desbloquear esta actividad.', 'warning'); return; } AppState.studentLessonIndex = index; renderStudentCoursePlayer(); }
 
-function navigateStudentLesson(offset) { const target = AppState.studentLessonIndex + offset; if (AppState.studentLessons[target] && AppState.studentLessons[target].bloqueado) { Swal.fire('Contenido bloqueado', 'Debes completar la actividad obligatoria anterior para continuar.', 'warning'); return; } AppState.studentLessonIndex = target; renderStudentCoursePlayer(); }
-async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
+function navigateStudentLesson(offset) { const target = AppState.studentLessonIndex + offset; if (AppState.studentLessons[target] && AppState.studentLessons[target].bloqueado) { Swal.fire('Contenido bloqueado', 'Completa primero el paso anterior para desbloquear esta actividad.', 'warning'); return; } AppState.studentLessonIndex = target; renderStudentCoursePlayer(); }
+async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); leccion.progreso = { completado: true }; AppState.studentLessons = applySequentialLocks(AppState.studentLessons); renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
 </script>

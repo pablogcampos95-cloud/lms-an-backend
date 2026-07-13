@@ -60,6 +60,16 @@ const AuthService = {
     return result.usuario;
   },
 
+  async changePassword(currentPassword, newPassword) {
+    const result = await ApiService.request('/api/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    ApiService.setSession(ApiService.getToken(), result.usuario);
+    return result.usuario;
+  },
+
   logout() {
     ApiService.clearSession();
   },

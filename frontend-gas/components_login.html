@@ -35,3 +35,40 @@
     </form>
   </div>
 </section>
+
+<div class="modal fade" id="passwordChangeModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content premium-modal">
+      <form id="passwordChangeForm">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">SEGURIDAD</span>
+            <h5 class="modal-title">Cambia tu contrasena</h5>
+          </div>
+        </div>
+        <div class="modal-body">
+          <p class="text-secondary">Tu cuenta fue creada con una clave temporal. Para continuar, define una contrasena personal.</p>
+          <div class="vstack gap-3">
+            <div>
+              <label class="form-label" for="passwordChangeCurrent">Clave temporal</label>
+              <input id="passwordChangeCurrent" class="form-control" type="password" autocomplete="current-password" required>
+            </div>
+            <div>
+              <label class="form-label" for="passwordChangeNew">Nueva contrasena</label>
+              <input id="passwordChangeNew" class="form-control" type="password" autocomplete="new-password" minlength="6" required>
+            </div>
+            <div>
+              <label class="form-label" for="passwordChangeConfirm">Confirmar nueva contrasena</label>
+              <input id="passwordChangeConfirm" class="form-control" type="password" autocomplete="new-password" minlength="6" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="passwordChangeButton" class="btn btn-gold" type="submit">
+            <i class="fa-solid fa-shield-halved me-2"></i>Guardar y continuar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
