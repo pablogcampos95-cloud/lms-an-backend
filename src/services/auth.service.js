@@ -11,6 +11,7 @@ const USER_SELECT = '*, rol:roles(id,nombre,descripcion)';
 const CAMPAIGN_COLUMN = 'Campa\u00f1a';
 const PUBLIC_USERNAME_DOMAIN = process.env.PUBLIC_USERNAME_DOMAIN || 'ialearningsolutions.net';
 const PUBLIC_TEMPORARY_PASSWORD = process.env.PUBLIC_TEMPORARY_PASSWORD || '123456';
+const PUBLIC_REGISTRATION_ADMIN_EMAIL = process.env.PUBLIC_REGISTRATION_ADMIN_EMAIL || 'Pablo.gutierrez@ialearningsolutions.net';
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
@@ -104,6 +105,53 @@ const sendMagicLinkWithResend = async ({ to, name, actionLink, username, tempora
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw resendError(payload, response.status);
   return true;
+};
+
+const sendAdminRegistrationNotification = async ({ student, courseId, source }) => {
+  if (!process.env.RESEND_API_KEY || !PUBLIC_REGISTRATION_ADMIN_EMAIL) return false;
+
+  const from = process.env.RESEND_FROM_EMAIL || 'IA Learning Solutions <onboarding@resend.dev>';
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [PUBLIC_REGISTRATION_ADMIN_EMAIL],
+        subject: 'Nuevo estudiante registrado en IA Learning Solutions',
+        html: `
+          <div style="font-family:Arial,sans-serif;background:#06111f;padding:28px;color:#eaf6ff">
+            <div style="max-width:620px;margin:auto;background:#0b1d33;border:1px solid #00c8ff55;border-radius:18px;padding:26px">
+              <p style="letter-spacing:2px;text-transform:uppercase;color:#00d9ff;font-size:12px;margin:0 0 12px">IA Learning Solutions LMS</p>
+              <h1 style="font-size:24px;margin:0 0 16px;color:#fff">Nuevo registro de estudiante</h1>
+              <table style="width:100%;border-collapse:collapse;color:#dff7ff">
+                <tr><td style="padding:8px 0;color:#8fa4b8">Nombre</td><td style="padding:8px 0"><strong>${student.Nombres || ''}</strong></td></tr>
+                <tr><td style="padding:8px 0;color:#8fa4b8">Correo</td><td style="padding:8px 0">${student.Correo || ''}</td></tr>
+                <tr><td style="padding:8px 0;color:#8fa4b8">Celular</td><td style="padding:8px 0">${student.Celular || 'No registrado'}</td></tr>
+                <tr><td style="padding:8px 0;color:#8fa4b8">Usuario creado</td><td style="padding:8px 0">${student.usuario || ''}</td></tr>
+                <tr><td style="padding:8px 0;color:#8fa4b8">Curso ID</td><td style="padding:8px 0">${courseId || 'No indicado'}</td></tr>
+                <tr><td style="padding:8px 0;color:#8fa4b8">Origen</td><td style="padding:8px 0">${source || 'Cursos Gratis'}</td></tr>
+              </table>
+              <p style="font-size:13px;line-height:1.5;color:#8fa4b8;margin-top:18px">Este aviso se genero automaticamente desde el registro publico de cursos gratis.</p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      console.error('No se pudo notificar nuevo registro al administrador', payload);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('No se pudo notificar nuevo registro al administrador', error);
+    return false;
+  }
 };
 
 const getUserByCredential = async (credential) => {
@@ -308,6 +356,7 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, ce
   });
 
   await ensureCourseAssignment(created.id, cursoId);
+  await sendAdminRegistrationNotification({ student: created, courseId: cursoId, source: 'Registro con contrasena' });
 
   const user = await getUserByCredential(username);
   return signSession(user, true);
@@ -349,6 +398,7 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, celular, curso_
     });
     existing = await getUserByCredential(created.usuario || generatedUsername);
     includeTemporaryCredentials = true;
+    await sendAdminRegistrationNotification({ student: created, courseId: cursoId, source: 'Enlace magico / cursos gratis' });
   }
 
   if (existing && cursoId) await ensureCourseAssignment(existing.id, cursoId);

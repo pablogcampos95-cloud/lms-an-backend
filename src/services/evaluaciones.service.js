@@ -192,6 +192,22 @@ const remove = async (user, id) => { const current = await getEvaluation(id); aw
 const reorder = async (user, id, direction) => { const current = await getEvaluation(id); await assertCourseAccess(user, current.curso_id); return courseSequence.reorder('Evaluacion', id, direction); };
 const duplicate = async (user, id) => { const source = await detail(user, id); const { preguntas, curso, modulo, leccion, creador, ...payload } = source; return create(user, { ...payload, orden: null, titulo: `${source.titulo} (copia)`, estado: 'Borrador', preguntas }); };
 
+const getAttemptResponses = async (attemptId) => {
+  const { data, error } = await supabase
+    .from('evaluacion_respuestas')
+    .select('*')
+    .eq('intento_id', attemptId);
+  fail(error);
+  return data;
+};
+
+const buildAttemptPayload = async (attempt, evaluation) => ({
+  intento: attempt,
+  evaluacion: evaluation,
+  finalizado: attempt && attempt.estado !== 'EnProgreso',
+  respuestas: attempt && attempt.estado !== 'EnProgreso' ? await getAttemptResponses(attempt.id) : [],
+});
+
 const startAttempt = async (user, evaluationId) => {
   if (roleName(user) !== 'Estudiante') throw new AppError('Solo estudiantes pueden responder evaluaciones', 403);
   const evaluation = await detail(user, evaluationId);
@@ -201,7 +217,11 @@ const startAttempt = async (user, evaluationId) => {
   const attempts = evaluation.intentos || [];
   const active = attempts.find((attempt) => attempt.estado === 'EnProgreso');
   if (active) return { intento: active, evaluacion: evaluation };
-  if (attempts.length >= evaluation.intentos_permitidos || (attempts.length && !evaluation.permitir_reintentos)) throw new AppError('No tienes intentos disponibles', 409);
+  const latestFinished = attempts.find((attempt) => attempt.estado !== 'EnProgreso');
+  if (attempts.length >= evaluation.intentos_permitidos || (attempts.length && !evaluation.permitir_reintentos)) {
+    if (latestFinished) return buildAttemptPayload(latestFinished, evaluation);
+    throw new AppError('No tienes intentos disponibles', 409);
+  }
   const { data, error } = await supabase.from('evaluacion_intentos').insert({ evaluacion_id: evaluationId, usuario_id: user.id, numero_intento: attempts.length + 1 }).select('*').single();
   fail(error);
   return { intento: data, evaluacion: evaluation };

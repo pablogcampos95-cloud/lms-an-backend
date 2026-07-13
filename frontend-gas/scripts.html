@@ -1463,7 +1463,7 @@ async function showEvaluationResults(id) {
 }
 async function gradeManualAnswer(id) { try { await EvaluacionesService.calificarRespuesta(id,{puntaje:Number(document.getElementById(`grade-score-${id}`).value),retroalimentacion:document.getElementById(`grade-feedback-${id}`).value}); toastSuccess('Respuesta calificada'); Swal.close(); } catch(error){ Swal.fire('No se pudo calificar',error.message,'error'); } }
 
-async function takeEvaluation(id) { try { const data = await EvaluacionesService.iniciar(id); AppState.currentAttempt = data; const evaluation = data.evaluacion; document.getElementById('takeEvaluationTitle').textContent = evaluation.titulo; document.getElementById('takeEvaluationMeta').textContent = `${evaluation.curso.nombre} / Intento ${data.intento.numero_intento} de ${evaluation.intentos_permitidos}`; document.getElementById('takeEvaluationBody').innerHTML = renderEvaluationQuestions(evaluation); AppState.takeEvaluationModal.show(); } catch(error){ Swal.fire('No se pudo iniciar',error.message,'error'); } }
+async function takeEvaluation(id) { try { const data = await EvaluacionesService.iniciar(id); AppState.currentAttempt = data; const evaluation = data.evaluacion; document.getElementById('takeEvaluationTitle').textContent = evaluation.titulo; document.getElementById('takeEvaluationMeta').textContent = `${evaluation.curso.nombre} / Intento ${data.intento.numero_intento} de ${evaluation.intentos_permitidos}`; document.getElementById('takeEvaluationBody').innerHTML = renderIntegratedEvaluationQuestions(evaluation, data.respuestas || [], Boolean(data.finalizado)); AppState.takeEvaluationModal.show(); } catch(error){ Swal.fire('No se pudo iniciar',error.message,'error'); } }
 function renderStudentQuestion(question) { if (question.tipo === 'TextoLargo') return '<textarea class="form-control student-answer-text" rows="6" required></textarea>'; if (question.tipo === 'TextoCorto') return '<input class="form-control student-answer-text" required>'; return `<div class="student-answer-options">${question.opciones.map((option) => `<label><input class="form-check-input student-answer-option" type="${question.tipo === 'OpcionMultiple' ? 'checkbox' : 'radio'}" name="question-${question.id}" value="${option.id}"><span>${escapeHtml(option.texto)}</span></label>`).join('')}</div>`; }
 async function submitEvaluationAttempt(event) { event.preventDefault(); const answers = Array.from(event.currentTarget.querySelectorAll('.take-question')).map((card) => { const type = card.dataset.questionType; const checked = Array.from(card.querySelectorAll('.student-answer-option:checked')).map((input) => Number(input.value)); return { pregunta_id: Number(card.dataset.questionId), opcion_id: type === 'OpcionMultiple' ? null : checked[0] || null, opciones_ids: type === 'OpcionMultiple' ? checked : null, respuesta_texto: card.querySelector('.student-answer-text') ? card.querySelector('.student-answer-text').value : null }; }); try { const result = await EvaluacionesService.enviar(AppState.currentAttempt.evaluacion.id,AppState.currentAttempt.intento.id,answers); AppState.takeEvaluationModal.hide(); await loadEvaluations(); Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : result.estado === 'PendienteCalificacion' ? 'Enviada para revision' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info'); } catch(error){ Swal.fire('No se pudo enviar',error.message,'error'); } }
 function viewEvaluationResult(id) { const item = AppState.evaluaciones.find((evaluation) => evaluation.id === id); const attempt = item && item.ultimo_intento; Swal.fire({ icon: attempt && attempt.estado === 'Aprobado' ? 'success' : 'info', title: item ? item.titulo : 'Resultado', html: attempt ? `<p>Estado: <strong>${escapeHtml(attempt.estado)}</strong></p><div class="display-4">${Number(attempt.porcentaje || 0)}%</div>` : 'Sin resultado disponible' }); }
@@ -2604,8 +2604,33 @@ function journeyActivityState(activity) { const record=activity.tipo_actividad==
 function renderJourneyActivity(activity) { const state=journeyActivityState(activity);if(activity.tipo_actividad==='Foro')return `<div id="integratedForum-${activity.id}" class="integrated-forum"><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando foro...</div></div>`;return `<section id="integratedEvaluation-${activity.id}" class="student-integrated-evaluation"><div class="journey-activity ${activity.completada ? 'completed' : ''}"><div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div><div><span class="eyebrow">EVALUACION${activity.obligatoria ? ' / OBLIGATORIA' : ''}</span><h2>${escapeHtml(activity.titulo)}</h2><p>${escapeHtml(activity.descripcion || activity.instrucciones || '')}</p><span class="${state.className}"><i class="fa-solid ${state.icon} me-2"></i>${state.label}</span>${state.message?`<p class="mt-2 mb-0 ${state.className}">${escapeHtml(state.message)}</p>`:''}</div></div><div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando evaluacion...</div></section>`; }
 function openJourneyActivity(index) { const activity = AppState.studentLessons[index]; if (!activity || !activity.es_actividad) return; if (activity.tipo_actividad === 'Foro') { loadForumWorkspace(activity.id, `integratedForum-${activity.id}`); } else loadIntegratedEvaluation(activity.id); }
 
-function renderEvaluationQuestions(evaluation) {
-  return (evaluation.preguntas || []).map((question,index) => `<article class="take-question" data-question-id="${question.id}" data-question-type="${question.tipo}"><div class="take-question-heading"><span>${index+1}</span><div><h3>${escapeHtml(question.enunciado)}</h3><small>${question.puntaje} punto(s)</small></div></div>${renderStudentQuestion(question)}</article>`).join('');
+function answerForQuestion(answers = [], questionId) {
+  return (answers || []).find((answer) => Number(answer.pregunta_id) === Number(questionId)) || null;
+}
+
+function answerSelectedOptionIds(answer) {
+  if (!answer) return [];
+  if (Array.isArray(answer.opciones_ids)) return answer.opciones_ids.map(Number);
+  if (answer.opcion_id) return [Number(answer.opcion_id)];
+  return [];
+}
+
+function renderIntegratedStudentQuestion(question, answer = null, disabled = false) {
+  const disabledAttr = disabled ? ' disabled' : '';
+  const result = disabled && answer && answer.correcta !== null
+    ? `<span class="badge ${answer.correcta ? 'text-bg-success' : 'text-bg-danger'} ms-2">${answer.correcta ? 'Correcta' : 'Incorrecta'}</span>`
+    : '';
+  if (question.tipo === 'TextoLargo') return `<textarea class="form-control student-answer-text" rows="6" required${disabledAttr}>${escapeHtml(answer ? answer.respuesta_texto || '' : '')}</textarea>${result}`;
+  if (question.tipo === 'TextoCorto') return `<input class="form-control student-answer-text" value="${escapeHtml(answer ? answer.respuesta_texto || '' : '')}" required${disabledAttr}>${result}`;
+  const selectedIds = answerSelectedOptionIds(answer);
+  return `<div class="student-answer-options">${question.opciones.map((option) => `<label><input class="form-check-input student-answer-option" type="${question.tipo === 'OpcionMultiple' ? 'checkbox' : 'radio'}" name="question-${question.id}" value="${option.id}" ${selectedIds.includes(Number(option.id)) ? 'checked' : ''}${disabledAttr}><span>${escapeHtml(option.texto)}</span></label>`).join('')}</div>${result}`;
+}
+
+function renderIntegratedEvaluationQuestions(evaluation, answers = [], disabled = false) {
+  return (evaluation.preguntas || []).map((question,index) => {
+    const answer = answerForQuestion(answers, question.id);
+    return `<article class="take-question ${disabled ? 'answered' : ''}" data-question-id="${question.id}" data-question-type="${question.tipo}"><div class="take-question-heading"><span>${index+1}</span><div><h3>${escapeHtml(question.enunciado)}</h3><small>${question.puntaje} punto(s)</small></div></div>${renderIntegratedStudentQuestion(question, answer, disabled)}</article>`;
+  }).join('');
 }
 
 async function loadIntegratedEvaluation(id) {
@@ -2621,7 +2646,13 @@ async function loadIntegratedEvaluation(id) {
     const evaluation = data.evaluacion;
     const attempt = data.intento;
     const isFinished = attempt && ['Aprobado','Desaprobado','PendienteCalificacion','Enviado'].includes(attempt.estado);
+    const answers = data.respuestas || [];
     const status = isFinished ? `<div class="evaluation-result-strip"><span>${escapeHtml(attempt.estado)}</span><strong>${Number(attempt.porcentaje || 0)}%</strong></div>` : '';
+    const finishedMessage = attempt && attempt.estado === 'Aprobado'
+      ? `Aprobaste con ${Number(attempt.porcentaje || 0)}%. Ya puedes continuar con el siguiente paso.`
+      : attempt && attempt.estado === 'PendienteCalificacion'
+        ? 'Tu evaluacion queda registrada y pendiente de revision por el instructor.'
+        : `Tu resultado fue ${Number(attempt.porcentaje || 0)}%.`;
     target.innerHTML = `
       <div class="journey-activity ${isFinished ? 'completed' : ''}">
         <div class="journey-activity-icon"><i class="fa-solid fa-clipboard-check"></i></div>
@@ -2633,7 +2664,7 @@ async function loadIntegratedEvaluation(id) {
           ${status}
         </div>
       </div>
-      ${isFinished ? '<div class="alert alert-info mb-0">Ya registramos tu evaluacion. Puedes continuar con el siguiente paso.</div>' : `<form class="student-integrated-evaluation-form" onsubmit="submitIntegratedEvaluationAttempt(event, ${id})">${renderEvaluationQuestions(evaluation)}<div class="student-integrated-evaluation-actions"><small>Intento ${attempt.numero_intento} de ${evaluation.intentos_permitidos}</small><button class="btn btn-gold" type="submit"><i class="fa-solid fa-paper-plane me-2"></i>Enviar evaluacion</button></div></form>`}`;
+      ${isFinished ? `<div class="alert alert-info">${escapeHtml(finishedMessage)}</div><div class="student-integrated-evaluation-form readonly">${renderIntegratedEvaluationQuestions(evaluation, answers, true)}</div>` : `<form class="student-integrated-evaluation-form" onsubmit="submitIntegratedEvaluationAttempt(event, ${id})">${renderIntegratedEvaluationQuestions(evaluation)}<div class="student-integrated-evaluation-actions"><small>Intento ${attempt.numero_intento} de ${evaluation.intentos_permitidos}</small><button class="btn btn-gold" type="submit"><i class="fa-solid fa-paper-plane me-2"></i>Enviar evaluacion</button></div></form>`}`;
   } catch(error) {
     target.innerHTML = `<div class="alert alert-warning mb-0"><strong>No se pudo cargar la evaluacion.</strong><br>${escapeHtml(error.message || 'Intenta nuevamente en unos segundos.')}</div>`;
   }
@@ -2658,13 +2689,23 @@ async function submitIntegratedEvaluationAttempt(event, id) {
   });
   try {
     const result = await EvaluacionesService.enviar(attemptData.evaluacion.id, attemptData.intento.id, answers);
-    const lesson = AppState.studentLessons[AppState.studentLessonIndex];
-    if (lesson && Number(lesson.id) === Number(id)) {
-      lesson.intento = result;
-      lesson.completada = ['Aprobado','Enviado','PendienteCalificacion'].includes(result.estado);
-      AppState.studentLessons = applySequentialLocks(AppState.studentLessons);
+    if (AppState.cursoActual && !AppState.previewMode) {
+      const currentIndex = AppState.studentLessonIndex;
+      AppState.cursoActual = await CursosService.aprender(AppState.cursoActual.id);
+      AppState.studentLessons = buildStudentJourney(AppState.cursoActual);
+      const updatedIndex = AppState.studentLessons.findIndex((item) => item.es_actividad && item.tipo_actividad === 'Evaluacion' && Number(item.id) === Number(id));
+      AppState.studentLessonIndex = updatedIndex >= 0 ? updatedIndex : currentIndex;
+      renderStudentCoursePlayer();
+      if (isStudent()) loadStudentCourses();
+    } else {
+      const lesson = AppState.studentLessons[AppState.studentLessonIndex];
+      if (lesson && Number(lesson.id) === Number(id)) {
+        lesson.intento = result;
+        lesson.completada = ['Aprobado','Enviado','PendienteCalificacion'].includes(result.estado);
+        AppState.studentLessons = applySequentialLocks(AppState.studentLessons);
+      }
+      await loadIntegratedEvaluation(id);
     }
-    await loadIntegratedEvaluation(id);
     Swal.fire(result.estado === 'Aprobado' ? 'Evaluacion aprobada' : 'Evaluacion enviada', result.estado === 'PendienteCalificacion' ? 'Tu resultado estara disponible cuando el instructor revise las respuestas abiertas.' : `Resultado: ${result.porcentaje}%`, result.estado === 'Aprobado' ? 'success' : 'info');
   } catch(error) {
     Swal.fire('No se pudo enviar', error.message, 'error');
