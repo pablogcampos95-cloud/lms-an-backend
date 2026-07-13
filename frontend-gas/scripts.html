@@ -14,6 +14,7 @@ const AppState = {
   courseAssignmentModal: null,
   certificateTemplateModal: null,
   certificateViewModal: null,
+  currentCertificate: null,
   passwordChangeModal: null,
   certificateTemplates: [],
   studentCertificates: [],
@@ -1588,6 +1589,7 @@ async function loadStudentCertificates() {
 function openStudentCertificate(id) {
   const certificate = (AppState.studentCertificates || []).find((item) => Number(item.id) === Number(id));
   if (!certificate) return;
+  AppState.currentCertificate = certificate;
   const template = certificate.plantilla || {};
   const background = template.fondo_url || '/assets/certificates/ials-diploma-template.png';
   document.getElementById('certificateViewBody').innerHTML = `
@@ -1598,6 +1600,28 @@ function openStudentCertificate(id) {
     </div>
   `;
   AppState.certificateViewModal.show();
+}
+
+async function downloadCurrentCertificatePdf() {
+  const certificateNode = document.querySelector('#certificateViewBody .issued-certificate');
+  if (!certificateNode) return;
+  if (!window.html2canvas || !window.jspdf) {
+    Swal.fire('PDF no disponible', 'No se pudo cargar el generador de PDF. Intenta nuevamente.', 'warning');
+    return;
+  }
+  const certificate = AppState.currentCertificate || {};
+  const courseName = certificate.curso?.nombre || 'certificado';
+  const fileName = `certificado-${courseName}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '.pdf';
+  try {
+    const canvas = await html2canvas(certificateNode, { scale: 2, useCORS: true, backgroundColor: null });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    pdf.save(fileName);
+  } catch (error) {
+    Swal.fire('No se pudo descargar', error.message || 'Intenta nuevamente.', 'error');
+  }
 }
 async function loadCertificateTemplates() {
   const container = document.getElementById('certificateTemplatesContent');
@@ -2568,6 +2592,30 @@ function getStudentPlayerContainer() {
   return document.getElementById('coursePreviewBody');
 }
 
+function canFinishCurrentCourse() {
+  if (AppState.previewMode || !AppState.cursoActual || !AppState.studentLessons.length) return false;
+  if (AppState.studentLessonIndex !== AppState.studentLessons.length - 1) return false;
+  return isJourneyItemComplete(AppState.studentLessons[AppState.studentLessonIndex]);
+}
+
+function renderStudentCurrentAction(leccion) {
+  if (AppState.previewMode) return '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>';
+  if (canFinishCurrentCourse()) return '<span class="preview-mode-label text-success"><i class="fa-solid fa-circle-check"></i> Curso completado</span>';
+  if (leccion.es_actividad && leccion.tipo_actividad === 'Foro') return '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>';
+  if (leccion.es_actividad && leccion.tipo_actividad === 'Evaluacion') return '<span class="preview-mode-label"><i class="fa-solid fa-clipboard-check"></i> Responde la evaluacion en esta seccion</span>';
+  if (leccion.es_actividad) return `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>`;
+  return `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`;
+}
+
+function renderStudentNextAction() {
+  if (canFinishCurrentCourse()) {
+    return '<button class="btn btn-gold" type="button" onclick="finishStudentCourseAndDownloadCertificate()"><i class="fa-solid fa-award me-2"></i>Finalizar curso y obtener certificado</button>';
+  }
+  const next = AppState.studentLessons[AppState.studentLessonIndex + 1];
+  const disabled = AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (next && next.bloqueado) ? 'disabled' : '';
+  return `<button class="btn btn-gold" ${disabled} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button>`;
+}
+
 function renderStudentCoursePlayer() {
   stopPlaybackInElement(getStudentPlayerContainer());
   const leccion = AppState.studentLessons[AppState.studentLessonIndex];
@@ -2581,6 +2629,8 @@ function renderStudentCoursePlayer() {
   const isOutlineOpen = AppState.studentOutlineOpen;
   const outlineOpen = isOutlineOpen ? 'outline-open' : 'outline-collapsed';
   const activityContent = leccion.es_actividad ? renderJourneyActivity(leccion) : `<div class="student-lesson-heading"><div><span>${escapeHtml(leccion.modulo_nombre || '')}</span><h2>${escapeHtml(leccion.titulo)}</h2><p>${escapeHtml(leccion.descripcion || '')}</p></div></div><div class="lesson-content">${renderLessonPreview(leccion)}</div>`;
+  const currentAction = renderStudentCurrentAction(leccion);
+  const nextAction = renderStudentNextAction();
   container.innerHTML = `
     <div class="student-course-player">
       <header class="student-player-cover" ${cover}><div><span class="eyebrow">${AppState.previewMode ? 'VISTA PREVIA' : 'MI CURSO'}</span><h2>${escapeHtml(curso.nombre)}</h2><p>${escapeHtml(curso.descripcion_corta || '')}</p></div><div class="student-player-progress"><strong>${AppState.studentLessonIndex + 1}/${AppState.studentLessons.length}</strong><span>pasos</span></div></header>
@@ -2592,7 +2642,7 @@ function renderStudentCoursePlayer() {
         <main class="student-player-content">
           ${isOutlineOpen ? '' : '<button class="student-outline-toggle" type="button" onclick="toggleStudentOutline(true)"><i class="fa-solid fa-list-check me-2"></i>Mostrar contenido del curso</button>'}
           ${activityContent}
-          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${AppState.previewMode ? '<span class="preview-mode-label"><i class="fa-solid fa-eye"></i> Navegacion de prueba</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Foro' ? '<span class="preview-mode-label"><i class="fa-solid fa-comments"></i> Participa directamente en el foro</span>' : leccion.es_actividad && leccion.tipo_actividad === 'Evaluacion' ? '<span class="preview-mode-label"><i class="fa-solid fa-clipboard-check"></i> Responde la evaluacion en esta seccion</span>' : leccion.es_actividad ? `<button class="btn btn-outline-info" onclick="openJourneyActivity(${AppState.studentLessonIndex})"><i class="fa-solid fa-list-check me-2"></i>${leccion.completada ? 'Ver actividad' : 'Completar actividad'}</button>` : `<button class="btn btn-outline-success" onclick="completeStudentLesson()"><i class="fa-solid fa-check me-2"></i>${leccion.progreso && leccion.progreso.completado ? 'Completado' : 'Marcar como completado'}</button>`}<button class="btn btn-gold" ${AppState.studentLessonIndex >= AppState.studentLessons.length - 1 || (AppState.studentLessons[AppState.studentLessonIndex + 1] && AppState.studentLessons[AppState.studentLessonIndex + 1].bloqueado) ? 'disabled' : ''} onclick="navigateStudentLesson(1)">Siguiente<i class="fa-solid fa-arrow-right ms-2"></i></button></div>
+          <div class="student-player-actions"><button class="btn btn-outline-light" ${AppState.studentLessonIndex === 0 ? 'disabled' : ''} onclick="navigateStudentLesson(-1)"><i class="fa-solid fa-arrow-left me-2"></i>Anterior</button>${currentAction}${nextAction}</div>
         </main>
       </div>
     </div>`;
@@ -2748,4 +2798,31 @@ function selectStudentLesson(index) { if (AppState.studentLessons[index].bloquea
 
 function navigateStudentLesson(offset) { const target = AppState.studentLessonIndex + offset; if (AppState.studentLessons[target] && AppState.studentLessons[target].bloqueado) { Swal.fire('Contenido bloqueado', 'Completa primero el paso anterior para desbloquear esta actividad.', 'warning'); return; } AppState.studentLessonIndex = target; renderStudentCoursePlayer(); }
 async function completeStudentLesson() { const leccion = AppState.studentLessons[AppState.studentLessonIndex]; try { await CursosService.completarLeccion(leccion.id); if (AppState.cursoActual && !AppState.previewMode) { const currentId = leccion.id; AppState.cursoActual = await CursosService.aprender(AppState.cursoActual.id); AppState.studentLessons = buildStudentJourney(AppState.cursoActual); const updatedIndex = AppState.studentLessons.findIndex((item) => !item.es_actividad && Number(item.id) === Number(currentId)); AppState.studentLessonIndex = updatedIndex >= 0 ? updatedIndex : AppState.studentLessonIndex; } else { leccion.progreso = { completado: true }; AppState.studentLessons = applySequentialLocks(AppState.studentLessons); } renderStudentCoursePlayer(); if (isStudent()) await loadStudentCourses(); toastSuccess('Paso completado'); } catch (error) { Swal.fire('No se pudo registrar el avance', error.message, 'error'); } }
+
+async function finishStudentCourseAndDownloadCertificate() {
+  if (!canFinishCurrentCourse()) return;
+  const result = await Swal.fire({
+    title: 'Finalizar curso',
+    text: 'Se generara tu certificado y podras descargarlo en PDF.',
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: 'Finalizar curso',
+    cancelButtonText: 'Cancelar',
+  });
+  if (!result.isConfirmed) return;
+  try {
+    Swal.fire({ title: 'Generando certificado...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const certificate = await EstudianteService.finalizarCurso(AppState.cursoActual.id);
+    AppState.studentCertificates = [
+      certificate,
+      ...(AppState.studentCertificates || []).filter((item) => Number(item.id) !== Number(certificate.id)),
+    ];
+    await loadStudentCourses();
+    Swal.close();
+    openStudentCertificate(certificate.id);
+    setTimeout(downloadCurrentCertificatePdf, 600);
+  } catch (error) {
+    Swal.fire('No se pudo generar el certificado', error.message, 'error');
+  }
+}
 </script>

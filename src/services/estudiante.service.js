@@ -190,6 +190,24 @@ const getCertificates = async (usuarioId) => {
   })));
 };
 
+const finishCourse = async (usuarioId, cursoId) => {
+  const courseId = Number(cursoId);
+  if (!Number.isInteger(courseId)) throw new AppError('Curso invalido', 400);
+
+  const courses = await getAssignedCoursesProgress(usuarioId);
+  const course = courses.find((item) => Number(item.id) === courseId);
+  if (!course) throw new AppError('Curso no asignado al estudiante', 404);
+  if (course.total_lecciones <= 0 || course.avance < 100) {
+    throw new AppError('Completa todos los pasos del curso antes de generar el certificado', 400);
+  }
+
+  await syncCertificates(usuarioId, courses);
+  const certificates = await getCertificates(usuarioId);
+  const certificate = certificates.find((item) => Number(item.curso?.id || item.curso_id) === courseId);
+  if (!certificate) throw new AppError('No se pudo generar el certificado del curso', 500);
+  return certificate;
+};
+
 const getAssignments = async (usuarioId) => {
   const { data, error } = await supabase.from('curso_asignaciones').select('curso_id').eq('usuario_id', usuarioId).neq('estado', 'Cancelado');
   throwSupabaseError(error);
@@ -245,4 +263,4 @@ const isLessonAssigned = async (usuarioId, lessonId) => {
   return Boolean(data && data.modulo && courseIds.includes(Number(data.modulo.curso_id)));
 };
 
-module.exports = { getAssignedCourseIds, getDashboard, getEvaluations, getCertificates, getAssignments, setAssignments, getCourseStudents, setCourseStudents, isLessonAssigned };
+module.exports = { getAssignedCourseIds, getDashboard, getEvaluations, getCertificates, finishCourse, getAssignments, setAssignments, getCourseStudents, setCourseStudents, isLessonAssigned };
