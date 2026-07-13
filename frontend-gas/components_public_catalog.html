@@ -86,36 +86,24 @@
         <input id="publicRegisterCourseId" type="hidden">
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label" for="publicRegisterName">Nombre completo *</label>
+            <label class="form-label" for="publicRegisterName">Nombre y apellido *</label>
             <input id="publicRegisterName" class="form-control" autocomplete="name" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="publicRegisterPhone">Celular *</label>
+            <input id="publicRegisterPhone" class="form-control" type="tel" inputmode="tel" autocomplete="tel" required>
           </div>
           <div class="col-12">
             <label class="form-label" for="publicRegisterEmail">Correo electronico *</label>
             <input id="publicRegisterEmail" class="form-control" type="email" autocomplete="email" required>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="publicRegisterDni">Documento</label>
-            <input id="publicRegisterDni" class="form-control" inputmode="numeric" autocomplete="off">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="publicRegisterUser">Usuario</label>
-            <input id="publicRegisterUser" class="form-control" autocomplete="username" placeholder="Opcional">
-          </div>
-          <div class="col-12">
-            <label class="form-label" for="publicRegisterPassword">Contrasena *</label>
-            <input id="publicRegisterPassword" class="form-control" type="password" minlength="4" autocomplete="new-password" required>
-          </div>
         </div>
-        <div class="public-register-divider"><span>o entra sin contrasena</span></div>
-        <button id="publicMagicLinkButton" class="btn btn-outline-light w-100" type="button">
-          <i class="fa-solid fa-envelope-circle-check me-2"></i>Enviarme enlace magico
-        </button>
-        <small class="d-block text-secondary mt-2">Te enviaremos un enlace seguro a tu correo para crear o iniciar tu cuenta.</small>
+        <small class="d-block text-secondary mt-3">Te enviaremos un correo para confirmar tu registro y continuar con el acceso al curso.</small>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline-light" type="button" data-bs-dismiss="modal">Cancelar</button>
         <button id="publicRegisterButton" class="btn btn-gold" type="submit">
-          <i class="fa-solid fa-user-plus me-2"></i>Registrarme gratis
+          <i class="fa-solid fa-user-plus me-2"></i>Registrar
         </button>
       </div>
     </form>

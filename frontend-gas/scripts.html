@@ -147,7 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('openFreeCourses').addEventListener('click', scrollToFreeCourses);
   document.getElementById('backToPublicCatalog').addEventListener('click', showPublicCatalog);
   document.getElementById('publicRegisterForm').addEventListener('submit', handlePublicRegister);
-  document.getElementById('publicMagicLinkButton').addEventListener('click', handlePublicMagicLink);
+  const publicMagicLinkButton = document.getElementById('publicMagicLinkButton');
+  if (publicMagicLinkButton) publicMagicLinkButton.addEventListener('click', handlePublicMagicLink);
   document.getElementById('publicCourseSearch').addEventListener('input', renderPublicCatalog);
   document.getElementById('publicHeroSearch').addEventListener('input', syncPublicHeroSearch);
   document.getElementById('publicCategoryFilter').addEventListener('change', renderPublicCatalog);
@@ -616,28 +617,32 @@ function openPublicRegister(courseId = null) {
 async function handlePublicRegister(event) {
   event.preventDefault();
   const button = document.getElementById('publicRegisterButton');
+  const cursoId = document.getElementById('publicRegisterCourseId').value || null;
   const payload = {
     nombres: document.getElementById('publicRegisterName').value.trim(),
     correo: document.getElementById('publicRegisterEmail').value.trim(),
-    dni: document.getElementById('publicRegisterDni').value.trim(),
-    usuario: document.getElementById('publicRegisterUser').value.trim(),
-    password: document.getElementById('publicRegisterPassword').value,
-    curso_id: document.getElementById('publicRegisterCourseId').value || null,
+    celular: document.getElementById('publicRegisterPhone').value.trim(),
+    curso_id: cursoId,
+    redirect_to: buildMagicRedirectUrl(cursoId),
   };
 
   button.disabled = true;
-  button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando cuenta';
+  button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando correo';
   try {
-    const sessionUser = await AuthService.registerPublic(payload);
+    if (cursoId) localStorage.setItem('an_pending_free_course_id', String(cursoId));
+    await AuthService.requestMagicLink(payload);
     AppState.publicRegisterModal.hide();
-    await startSession(sessionUser);
-    if (payload.curso_id) showView('student-courses');
-    Swal.fire({ toast: true, position: 'top-end', timer: 2600, showConfirmButton: false, icon: 'success', title: 'Cuenta gratuita creada' });
+    await showBrandAlert({
+      icon: 'success',
+      title: 'Correo enviado',
+      text: 'Te enviamos un correo para confirmar tu registro y continuar con el acceso al curso.',
+      confirmButtonText: 'Entendido',
+    });
   } catch (error) {
-    Swal.fire('No se pudo registrar', error.message, 'error');
+    showBrandAlert({ icon: 'error', title: 'No se pudo registrar', text: error.message, confirmButtonText: 'Entendido' });
   } finally {
     button.disabled = false;
-    button.innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>Registrarme gratis';
+    button.innerHTML = '<i class="fa-solid fa-user-plus me-2"></i>Registrar';
   }
 }
 
@@ -655,8 +660,7 @@ async function handlePublicMagicLink() {
   const payload = {
     nombres: document.getElementById('publicRegisterName').value.trim(),
     correo: document.getElementById('publicRegisterEmail').value.trim(),
-    dni: document.getElementById('publicRegisterDni').value.trim(),
-    usuario: document.getElementById('publicRegisterUser').value.trim(),
+    celular: document.getElementById('publicRegisterPhone') ? document.getElementById('publicRegisterPhone').value.trim() : '',
     curso_id: cursoId,
     redirect_to: buildMagicRedirectUrl(cursoId),
   };

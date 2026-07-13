@@ -211,13 +211,32 @@ const ensureCourseAssignment = async (usuarioId, cursoId) => {
   if (error) throw new AppError('No se pudo asignar el curso gratuito', 500, error.message);
 };
 
-const createPublicStudent = async ({ nombres, correo, usuario, password, dni, curso_id: cursoId }) => {
+const isMissingOptionalColumn = (error, columnName) => {
+  const detail = [error && error.message, error && error.details].filter(Boolean).join(' ');
+  return new RegExp(`${columnName}|schema cache|could not find|column .*does not exist`, 'i').test(detail);
+};
+
+const createUsuarioAllowingMissingPhone = async (payload) => {
+  try {
+    return await usuariosService.createUsuario(payload);
+  } catch (error) {
+    if (payload.Celular && isMissingOptionalColumn(error, 'Celular')) {
+      const { Celular, ...fallbackPayload } = payload;
+      return usuariosService.createUsuario(fallbackPayload);
+    }
+    throw error;
+  }
+};
+
+const createPublicStudent = async ({ nombres, correo, usuario, password, dni, celular, curso_id: cursoId }) => {
   const cleanEmail = String(correo || '').trim().toLowerCase();
   const cleanName = String(nombres || '').trim();
   const cleanPassword = String(password || '').trim();
+  const cleanPhone = String(celular || '').trim();
 
   if (!cleanName) throw new AppError('El nombre es obligatorio', 400);
   if (!isValidEmail(cleanEmail)) throw new AppError('Ingresa un correo valido', 400);
+  if (!cleanPhone) throw new AppError('El celular es obligatorio', 400);
   if (cleanPassword.length < 4) throw new AppError('La contrasena debe tener al menos 4 caracteres', 400);
 
   const existing = await getUserByCredential(cleanEmail);
@@ -228,10 +247,11 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, cu
   const username = await uniqueUsername(usuario || cleanEmail.split('@')[0]);
   const documentValue = String(dni || '').trim() || Date.now().toString().slice(-9);
 
-  const created = await usuariosService.createUsuario({
+  const created = await createUsuarioAllowingMissingPhone({
     DNI: documentValue,
     Nombres: cleanName,
     Correo: cleanEmail,
+    Celular: cleanPhone || null,
     Cargo: 'Estudiante',
     [CAMPAIGN_COLUMN]: 'Cursos Gratis',
     Supervisor: '',
@@ -249,13 +269,15 @@ const createPublicStudent = async ({ nombres, correo, usuario, password, dni, cu
   return signSession(user, true);
 };
 
-const requestMagicLink = async ({ nombres, correo, usuario, dni, curso_id: cursoId, redirect_to: redirectTo }) => {
+const requestMagicLink = async ({ nombres, correo, usuario, dni, celular, curso_id: cursoId, redirect_to: redirectTo }) => {
   const cleanEmail = String(correo || '').trim().toLowerCase();
   const cleanName = String(nombres || '').trim();
+  const cleanPhone = String(celular || '').trim();
   const existing = cleanEmail ? await getUserByCredential(cleanEmail) : null;
 
   if (!isValidEmail(cleanEmail)) throw new AppError('Ingresa un correo valido', 400);
   if (!existing && !cleanName) throw new AppError('El nombre es obligatorio para crear la cuenta gratuita', 400);
+  if (!existing && !cleanPhone) throw new AppError('El celular es obligatorio para crear la cuenta gratuita', 400);
   await validateFreeCourse(cursoId);
   if (!isAllowedRedirectUrl(redirectTo)) throw new AppError('La URL de retorno no es valida', 400);
 
@@ -263,6 +285,7 @@ const requestMagicLink = async ({ nombres, correo, usuario, dni, curso_id: curso
     nombres: cleanName || existing.Nombres || cleanEmail.split('@')[0],
     usuario: String(usuario || existing?.usuario || '').trim(),
     dni: String(dni || existing?.DNI || '').trim(),
+    celular: cleanPhone || existing?.Celular || '',
     curso_id: String(cursoId || ''),
     origen: 'catalogo_publico',
   };
@@ -303,10 +326,11 @@ const completeMagicLink = async ({ access_token: accessToken, curso_id: cursoId 
   if (!user) {
     const rolId = await getStudentRoleId();
     const username = await uniqueUsername(metadata.usuario || email.split('@')[0]);
-    const created = await usuariosService.createUsuario({
+    const created = await createUsuarioAllowingMissingPhone({
       DNI: String(metadata.dni || '').trim() || Date.now().toString().slice(-9),
       Nombres: String(metadata.nombres || metadata.name || email.split('@')[0]).trim(),
       Correo: email,
+      Celular: String(metadata.celular || '').trim() || null,
       Cargo: 'Estudiante',
       [CAMPAIGN_COLUMN]: 'Cursos Gratis',
       Supervisor: '',
