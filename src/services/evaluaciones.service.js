@@ -203,16 +203,76 @@ const normalizeEvaluation = (payload) => ({
   condicion_desbloqueo: payload.condicion_desbloqueo || 'Responder', permitir_reintentos: payload.permitir_reintentos !== false, mensaje_bloqueo: payload.mensaje_bloqueo || null,
 });
 
-const replaceQuestions = async (evaluationId, questions = []) => {
-  fail((await supabase.from('evaluacion_preguntas').delete().eq('evaluacion_id', evaluationId)).error);
+const snapshotExistingOptionAnswers = async (evaluationId) => {
+  const { data: attempts, error: attemptsError } = await supabase.from('evaluacion_intentos').select('id').eq('evaluacion_id', evaluationId);
+  fail(attemptsError);
+  const attemptIds = (attempts || []).map((attempt) => attempt.id);
+  if (!attemptIds.length) return;
+  const { data: answers, error: answersError } = await supabase.from('evaluacion_respuestas').select('id,opcion_id,opciones_ids,respuesta_texto').in('intento_id', attemptIds);
+  fail(answersError);
+  const optionIds = [...new Set((answers || []).flatMap((answer) => [
+    answer.opcion_id,
+    ...(Array.isArray(answer.opciones_ids) ? answer.opciones_ids : []),
+  ]).filter(Boolean).map(Number))];
+  if (!optionIds.length) return;
+  const { data: options, error: optionsError } = await supabase.from('evaluacion_opciones').select('id,texto').in('id', optionIds);
+  fail(optionsError);
+  const optionText = new Map((options || []).map((option) => [Number(option.id), option.texto]));
+  for (const answer of answers || []) {
+    if (answer.respuesta_texto) continue;
+    const selectedIds = Array.isArray(answer.opciones_ids) && answer.opciones_ids.length ? answer.opciones_ids : [answer.opcion_id];
+    const text = selectedIds.filter(Boolean).map((id) => optionText.get(Number(id))).filter(Boolean).join('; ');
+    if (text) await updateRows('evaluacion_respuestas', { respuesta_texto: text }, (query) => query.eq('id', answer.id));
+  }
+};
+
+const saveQuestionOptions = async (questionId, options, preserveHistory) => {
+  if (!preserveHistory) {
+    fail((await supabase.from('evaluacion_opciones').delete().eq('pregunta_id', questionId)).error);
+  } else {
+    const { data: currentOptions, error } = await supabase.from('evaluacion_opciones').select('id,orden').eq('pregunta_id', questionId);
+    fail(error);
+    for (let index = 0; index < (currentOptions || []).length; index += 1) {
+      await updateRows('evaluacion_opciones', { orden: 10000 + index }, (query) => query.eq('id', currentOptions[index].id));
+    }
+  }
+  for (let optionIndex = 0; optionIndex < options.length; optionIndex += 1) {
+    const option = options[optionIndex];
+    const payload = { texto: option.texto, es_correcta: Boolean(option.es_correcta), orden: optionIndex + 1 };
+    if (preserveHistory && option.id) {
+      await updateRows('evaluacion_opciones', payload, (query) => query.eq('id', option.id).eq('pregunta_id', questionId));
+    } else {
+      await insertSingle('evaluacion_opciones', { pregunta_id: questionId, ...payload });
+    }
+  }
+};
+
+const replaceQuestions = async (evaluationId, questions = [], preserveHistory = false) => {
+  if (preserveHistory) {
+    await snapshotExistingOptionAnswers(evaluationId);
+    const { data: currentQuestions, error } = await supabase.from('evaluacion_preguntas').select('id,orden').eq('evaluacion_id', evaluationId);
+    fail(error);
+    for (let index = 0; index < (currentQuestions || []).length; index += 1) {
+      await updateRows('evaluacion_preguntas', { orden: 10000 + index, activo: false }, (query) => query.eq('id', currentQuestions[index].id));
+    }
+  } else {
+    fail((await supabase.from('evaluacion_preguntas').delete().eq('evaluacion_id', evaluationId)).error);
+  }
   for (let index = 0; index < questions.length; index += 1) {
     const question = questions[index];
     if (!question.enunciado || !question.tipo) throw new AppError('Cada pregunta requiere enunciado y tipo', 400);
-    const data = await insertSingle('evaluacion_preguntas', { evaluacion_id: evaluationId, enunciado: question.enunciado, tipo: question.tipo, puntaje: Number(question.puntaje || 1), explicacion: question.explicacion || null, criterios_evaluacion: question.criterios_evaluacion || null, guia_instructor: question.guia_instructor || null, calificacion_parcial: Boolean(question.calificacion_parcial), orden: index + 1, activo: question.activo !== false });
+    const questionPayload = { enunciado: question.enunciado, tipo: question.tipo, puntaje: Number(question.puntaje || 1), explicacion: question.explicacion || null, criterios_evaluacion: question.criterios_evaluacion || null, guia_instructor: question.guia_instructor || null, calificacion_parcial: Boolean(question.calificacion_parcial), orden: index + 1, activo: question.activo !== false };
+    let data;
+    if (preserveHistory && question.id) {
+      await updateRows('evaluacion_preguntas', questionPayload, (query) => query.eq('id', question.id).eq('evaluacion_id', evaluationId));
+      data = { id: question.id };
+    } else {
+      data = await insertSingle('evaluacion_preguntas', { evaluacion_id: evaluationId, ...questionPayload });
+    }
     const options = question.opciones || [];
     if (['OpcionUnica', 'OpcionMultiple'].includes(question.tipo) && options.length < 2) throw new AppError('Las preguntas de opcion requieren al menos dos alternativas', 400);
     if (question.tipo === 'VerdaderoFalso' && !options.length) options.push({ texto: 'Verdadero', es_correcta: question.respuesta_correcta === true }, { texto: 'Falso', es_correcta: question.respuesta_correcta !== true });
-    if (options.length) await insertMany('evaluacion_opciones', options.map((option, optionIndex) => ({ pregunta_id: data.id, texto: option.texto, es_correcta: Boolean(option.es_correcta), orden: optionIndex + 1 })));
+    if (options.length) await saveQuestionOptions(data.id, options, preserveHistory);
   }
 };
 
@@ -235,14 +295,11 @@ const update = async (user, id, payload) => {
   await assertCourseAccess(user, current.curso_id);
   const clean = normalizeEvaluation({ ...current, ...payload });
   await assertCourseAccess(user, clean.curso_id);
-  if (payload.preguntas) {
-    const { count, error: attemptsError } = await supabase.from('evaluacion_intentos').select('id', { count: 'exact', head: true }).eq('evaluacion_id', id);
-    fail(attemptsError);
-    if (count > 0) throw new AppError('No puedes modificar las preguntas porque la evaluacion ya tiene intentos registrados', 409);
-  }
+  const { count: attemptCount, error: attemptsError } = await supabase.from('evaluacion_intentos').select('id', { count: 'exact', head: true }).eq('evaluacion_id', id);
+  fail(attemptsError);
   if (clean.modulo_id && Number(clean.modulo_id) !== Number(current.modulo_id) && !payload.orden) clean.orden = await courseSequence.nextOrder(clean.modulo_id);
   await updateRows('evaluaciones', { ...clean, nombre: clean.titulo, updated_at: new Date().toISOString() }, (query) => query.eq('id', id));
-  if (payload.preguntas) await replaceQuestions(id, payload.preguntas);
+  if (payload.preguntas) await replaceQuestions(id, payload.preguntas, attemptCount > 0);
   return detail(user, id);
 };
 
@@ -317,7 +374,12 @@ const submitAttempt = async (user, evaluationId, attemptId, submittedAnswers) =>
       correct = JSON.stringify(correctIds) === JSON.stringify(selectedIds);
       score = correct ? Number(question.puntaje) : 0;
     }
-    const row = { intento_id: attemptId, pregunta_id: question.id, opcion_id: answer.opcion_id || null, opciones_ids: answer.opciones_ids || null, respuesta_texto: answer.respuesta_texto || null, puntaje_obtenido: score, correcta: correct, requiere_revision: review };
+    const selectedIds = (question.tipo === 'OpcionMultiple' ? answer.opciones_ids || [] : [answer.opcion_id]).filter(Boolean).map(Number);
+    const answerText = answer.respuesta_texto || selectedIds.map((id) => {
+      const option = question.opciones.find((item) => Number(item.id) === id);
+      return option ? option.texto : null;
+    }).filter(Boolean).join('; ') || null;
+    const row = { intento_id: attemptId, pregunta_id: question.id, opcion_id: answer.opcion_id || null, opciones_ids: answer.opciones_ids || null, respuesta_texto: answerText, puntaje_obtenido: score, correcta: correct, requiere_revision: review };
     fail((await supabase.from('evaluacion_respuestas').upsert(row, { onConflict: 'intento_id,pregunta_id' })).error);
   }
   fail((await supabase.from('evaluacion_intentos').update({ enviado_at: new Date().toISOString(), estado: 'Enviado' }).eq('id', attemptId)).error);
