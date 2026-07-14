@@ -16,6 +16,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const estudianteRoutes = require('./routes/estudiante.routes');
 const homePageRoutes = require('./routes/home-page.routes');
 const certificadosRoutes = require('./routes/certificados.routes');
+const aiRoutes = require('./routes/ai.routes');
 const { notFoundHandler, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -60,6 +61,7 @@ app.use('/api/evaluaciones', evaluacionesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/estudiante', estudianteRoutes);
 app.use('/api/certificados', certificadosRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.use(express.static(publicDir));
 app.get('*', (req, res, next) => {

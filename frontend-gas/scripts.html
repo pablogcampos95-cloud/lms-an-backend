@@ -198,10 +198,59 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('homeFeaturedMode').addEventListener('change', renderHomeAdminPreview);
   document.getElementById('homeFeaturedLimit').addEventListener('input', renderHomeAdminPreview);
   document.getElementById('homeVisibleCategories').addEventListener('input', renderHomeAdminPreview);
+  initAiAssistant();
   window.addEventListener('auth:expired', handleExpiredSession);
 
   boot();
 });
+
+function initAiAssistant() {
+  const form = document.getElementById('aiAssistantForm');
+  const input = document.getElementById('aiAssistantInput');
+  if (!form || !input) return;
+  document.querySelectorAll('[data-ai-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+      input.value = button.dataset.aiPrompt || '';
+      input.focus();
+    });
+  });
+  form.addEventListener('submit', handleAiAssistantSubmit);
+}
+
+function appendAiMessage(text, type = 'bot') {
+  const body = document.getElementById('aiAssistantBody');
+  if (!body) return null;
+  const message = document.createElement('div');
+  message.className = `ai-message ai-message-${type}`;
+  message.textContent = text;
+  body.appendChild(message);
+  body.scrollTop = body.scrollHeight;
+  return message;
+}
+
+async function handleAiAssistantSubmit(event) {
+  event.preventDefault();
+  const input = document.getElementById('aiAssistantInput');
+  const button = document.getElementById('aiAssistantSend');
+  const message = input.value.trim();
+  if (!message) return;
+  appendAiMessage(message, 'user');
+  input.value = '';
+  const loading = appendAiMessage('Pensando...', 'bot');
+  if (button) button.disabled = true;
+  try {
+    const result = await ApiService.request('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+    loading.textContent = result.data?.answer || 'No pude generar una respuesta.';
+  } catch (error) {
+    loading.textContent = error.message || 'No se pudo contactar al asistente.';
+  } finally {
+    if (button) button.disabled = false;
+    input.focus();
+  }
+}
 
 function handleExpiredSession() {
   AuthService.logout();
