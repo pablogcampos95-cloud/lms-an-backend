@@ -22,11 +22,11 @@ router.post('/chat', requireAuth, asyncHandler(async (req, res) => {
     body: JSON.stringify({
       model: GROQ_MODEL,
       temperature: 0.3,
-      max_tokens: 700,
+      max_tokens: 180,
       messages: [
         {
           role: 'system',
-          content: 'Eres el Asistente IA Learning Solutions del LMS. Responde en espanol, breve, claro y util. Ayuda con dudas de aprendizaje, cursos, evaluaciones y rutas. No inventes credenciales ni datos administrativos.',
+          content: 'Eres el Asistente IA Learning Solutions del LMS. Responde siempre en espanol, corto y directo: maximo 4 lineas o 3 bullets breves. No uses markdown pesado, titulos largos ni parrafos extensos. Ayuda con dudas de aprendizaje, cursos, evaluaciones y rutas. No inventes credenciales ni datos administrativos.',
         },
         { role: 'user', content: message },
       ],
