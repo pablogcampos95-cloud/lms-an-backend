@@ -2588,7 +2588,7 @@ function renderLessonPreview(leccion) {
     if (video && video.url) return renderVideoPlayer(video);
     if (leccion.url_externa) return `<div class="lesson-video-shell"><video class="lesson-video-player" src="${escapeHtml(leccion.url_externa)}" controls preload="metadata"></video></div>`;
   }
-  if (leccion.tipo_contenido === 'URL' && leccion.url_externa) return leccion.mostrar_embebido ? `<div class="responsive-embed"><iframe src="${escapeHtml(leccion.url_externa)}" loading="lazy"></iframe></div>` : `<a class="btn btn-outline-warning" href="${escapeHtml(leccion.url_externa)}" target="_blank" rel="noopener">Abrir recurso</a>`;
+  if (leccion.tipo_contenido === 'URL' && leccion.url_externa) return `<div class="responsive-embed"><iframe src="${escapeHtml(leccion.url_externa)}" loading="lazy" allowfullscreen></iframe></div><a class="btn btn-outline-light btn-sm mt-3" href="${escapeHtml(leccion.url_externa)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Abrir recurso en otra pestana</a>`;
   if (leccion.recursos && leccion.recursos.length) return leccion.recursos.map((recurso) => `<a class="btn btn-outline-light me-2" href="${escapeHtml(recurso.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-download me-2"></i>${escapeHtml(recurso.nombre_original)}</a>`).join('');
   return '<span class="text-secondary">Contenido pendiente.</span>';
 }
